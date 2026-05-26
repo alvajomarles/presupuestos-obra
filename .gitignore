@@ -1,0 +1,7 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local test outputs or logs
+*.log
+.system_generated/

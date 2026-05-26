@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Presupuestos Inteligentes de Obra es un software de Análisis de Precios Unitarios (APU) para el cálculo de costos y cotizaciones comerciales de construcción.">
+    <title>Presupuestos de Obra | Análisis de Precios Unitarios (APU)</title>
+    
+    <!-- Hojas de Estilo CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- CDNs: Chart.js para gráficos e Iconos Lucide -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <!-- Sidebar de Navegación -->
+    <aside class="sidebar no-print" id="app-sidebar">
+        <div class="brand">
+            <div class="brand-logo">P</div>
+            <span class="brand-name">PresupuestosObra</span>
+        </div>
+        
+        <nav>
+            <ul class="nav-menu">
+                <li>
+                    <a href="#dashboard" class="nav-item active" data-tab="dashboard" id="nav-link-dashboard">
+                        <i data-lucide="layout-dashboard"></i>
+                        <span>Panel General</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#budgets" class="nav-item" data-tab="budgets" id="nav-link-budgets">
+                        <i data-lucide="file-spreadsheet"></i>
+                        <span>Presupuestos</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#apu" class="nav-item" data-tab="apu" id="nav-link-apu">
+                        <i data-lucide="calculator"></i>
+                        <span>Análisis (APU)</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#materials" class="nav-item" data-tab="materials" id="nav-link-materials">
+                        <i data-lucide="box"></i>
+                        <span>Materiales</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#labor" class="nav-item" data-tab="labor" id="nav-link-labor">
+                        <i data-lucide="users"></i>
+                        <span>Mano de Obra</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#pdf-settings" class="nav-item" data-tab="pdf-settings" id="nav-link-pdf-settings">
+                        <i data-lucide="palette"></i>
+                        <span>Personalizar PDF</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#settings" class="nav-item" data-tab="settings" id="nav-link-settings">
+                        <i data-lucide="settings"></i>
+                        <span>Configuración</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        
+        <footer class="sidebar-footer">
+            <p>© 2026 PresupuestosObra</p>
+            <p style="font-size: 0.7rem; margin-top:4px;">Local Database v1.0</p>
+        </footer>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="main-content" id="app-main-content">
+        <!-- Contenedor dinámico de vistas -->
+        <section id="view-content" aria-live="polite">
+            <div class="loading">Cargando aplicación...</div>
+        </section>
+    </main>
+
+    <!-- Contenedor de Modal Global -->
+    <div class="modal-overlay no-print" id="modal-overlay">
+        <div class="modal-container" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <header class="modal-header">
+                <h2 class="modal-title" id="modal-title">Título del Modal</h2>
+                <button class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </header>
+            <div class="modal-body" id="modal-body">
+                <!-- Contenido dinámico del modal -->
+            </div>
+            <footer class="modal-footer" id="modal-footer">
+                <!-- Botones del modal -->
+            </footer>
+        </div>
+    </div>
+
+    <!-- Scripts de la Aplicación -->
+    <script src="js/database.js"></script>
+    <script src="js/apu.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
