@@ -631,10 +631,14 @@ textarea {
 
 /* Vista de Impresión del Presupuesto (Elegante, limpia, estilo corporativo) */
 @media print {
-    body {
+    html, body {
         background: #ffffff !important;
         color: #000000 !important;
         font-size: 10pt;
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        min-height: 0 !important;
     }
     /* Ocultar todo lo innecesario en la impresión */
     .sidebar, .main-content, .modal-header, .modal-footer, .btn, .search-filter-row, .view-subtitle, .brand, .sidebar-footer, .no-print {

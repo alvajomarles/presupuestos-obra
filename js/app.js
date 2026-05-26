@@ -34,3 +34,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cargar la pestaña por defecto (Dashboard)
     window.ui.switchTab('dashboard');
 });
+
+// Solución preventiva para evitar que Chart.js ResizeObserver entre en bucles infinitos durante la impresión en Edge/Chrome
+window.addEventListener('beforeprint', () => {
+    if (window.ui && window.ui.currentChart) {
+        window.ui.currentChart.destroy();
+        window.ui.currentChart = null;
+    }
+});
+
+window.addEventListener('afterprint', () => {
+    if (window.ui && window.ui.activeTab === 'dashboard') {
+        const contentContainer = document.getElementById('view-content');
+        if (contentContainer) {
+            window.ui.renderDashboard(contentContainer);
+        }
+    }
+});
