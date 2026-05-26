@@ -37,17 +37,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Solución preventiva para evitar que Chart.js ResizeObserver entre en bucles infinitos durante la impresión en Edge/Chrome
 window.addEventListener('beforeprint', () => {
-    if (window.ui && window.ui.currentChart) {
-        window.ui.currentChart.destroy();
-        window.ui.currentChart = null;
+    try {
+        if (window.ui && window.ui.currentChart) {
+            window.ui.currentChart.destroy();
+            window.ui.currentChart = null;
+        }
+    } catch (e) {
+        console.error('Error al destruir gráfico antes de imprimir:', e);
     }
 });
 
 window.addEventListener('afterprint', () => {
-    if (window.ui && window.ui.activeTab === 'dashboard') {
+    // Limpiar el contenedor de impresión
+    const printContainer = document.getElementById('print-container');
+    if (printContainer) {
+        printContainer.innerHTML = '';
+    }
+
+    // Restaurar el modal si estaba abierto antes de imprimir
+    if (window.ui && window.ui.wasModalOpenBeforePrint) {
+        window.ui.wasModalOpenBeforePrint = false;
+        window.ui.showModal(
+            window.ui.modalTitleBeforePrint,
+            window.ui.modalBodyBeforePrint,
+            window.ui.modalFooterBeforePrint,
+            window.ui.modalIsLargeBeforePrint
+        );
+    } else if (window.ui && window.ui.activeTab === 'dashboard') {
         const contentContainer = document.getElementById('view-content');
         if (contentContainer) {
             window.ui.renderDashboard(contentContainer);
         }
     }
 });
+

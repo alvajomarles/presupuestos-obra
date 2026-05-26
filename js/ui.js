@@ -13,6 +13,16 @@ class ObraUI {
     switchTab(tabId) {
         this.activeTab = tabId;
         
+        // Destruir gráfico activo preventivamente si cambiamos de pestaña para evitar observers huérfanos
+        if (tabId !== 'dashboard' && this.currentChart) {
+            try {
+                this.currentChart.destroy();
+                this.currentChart = null;
+            } catch (e) {
+                console.error("Error al destruir el gráfico al cambiar de pestaña:", e);
+            }
+        }
+        
         // Actualizar UI del menú lateral
         document.querySelectorAll('.nav-item').forEach(item => {
             if (item.dataset.tab === tabId) {
@@ -579,7 +589,29 @@ class ObraUI {
     }
 
     printBudget() {
-        window.print();
+        const printableArea = document.getElementById('printable-area');
+        const printContainer = document.getElementById('print-container');
+        if (printableArea && printContainer) {
+            // Guardar el estado del modal antes de imprimir para poder restaurarlo después
+            this.wasModalOpenBeforePrint = true;
+            this.modalTitleBeforePrint = document.getElementById('modal-title').innerText;
+            this.modalBodyBeforePrint = document.getElementById('modal-body').innerHTML;
+            this.modalFooterBeforePrint = document.getElementById('modal-footer').innerHTML;
+            this.modalIsLargeBeforePrint = document.querySelector('.modal-container').classList.contains('large-modal');
+
+            // Copiar el contenido al contenedor aislado de impresión
+            printContainer.innerHTML = printableArea.innerHTML;
+            
+            // Ocultar modal para limpiar el DOM de backdrop-filters y transiciones que cuelgan a Chromium
+            this.hideModal();
+            
+            // Esperar a que la transición de cierre del modal termine (300ms) antes de abrir el diálogo de impresión
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        } else {
+            window.print();
+        }
     }
 
     // --- WIZARD / BUILDER DE PRESUPUESTOS ---
