@@ -40,9 +40,38 @@ ObraUI.prototype.printBudget = function(this: ObraUI) {
         this.hideModal();
         
         // Esperar a que la transición de cierre del modal termine (300ms) antes de abrir el diálogo de impresión
-        setTimeout(() => {
-            window.print();
-        }, 300);
+        // Esperar a que termine la animación/cambio de UI antes de abrir el diálogo de impresión.
+        // Evita cuelgues en Chromium cuando hay transiciones/modal abierto/cambiando.
+        const fallbackTimeoutMs = 1200;
+        let didFire = false;
+
+        const safePrint = () => {
+            if (didFire) return;
+            didFire = true;
+            try {
+                window.print();
+            } catch (e) {
+                // Si por algún motivo falla print, no dejamos la app colgada.
+                console.error('window.print() failed', e);
+            }
+        };
+
+        // Fallback: aunque no haya transitionend.
+        const t = window.setTimeout(safePrint, fallbackTimeoutMs);
+
+        // Si hideModal dispara transiciones CSS, esperamos el transitionend de la modal (si existe).
+        const modalEl = document.querySelector('.modal-container');
+        if (modalEl) {
+            const onEnd = (ev: Event) => {
+                if (ev.target === modalEl || (ev as any).currentTarget === modalEl) {
+                    window.clearTimeout(t);
+                    modalEl.removeEventListener('transitionend', onEnd);
+                    safePrint();
+                }
+            };
+            modalEl.addEventListener('transitionend', onEnd);
+        }
+
     } else {
         window.print();
     }
