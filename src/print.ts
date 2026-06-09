@@ -34,49 +34,28 @@ ObraUI.prototype.printBudget = function(this: ObraUI) {
         this.modalIsLargeBeforePrint = document.querySelector('.modal-container')!.classList.contains('large-modal');
 
         // Copiar el contenido al contenedor aislado de impresión.
-        // Importante: clonar nodos en vez de usar innerHTML puede reducir trabajo
-        // de parseo/reejecución de estilos y minimizar freezes en Chromium.
-        // (Luego window.print() se dispara con la UI ya establecida.)
+        // Importante: clonamos nodos en vez de innerHTML para reducir carga.
         while (printContainer.firstChild) printContainer.removeChild(printContainer.firstChild);
         const clone = printableArea.cloneNode(true) as HTMLElement;
         printContainer.appendChild(clone);
 
-        // Ocultar modal para limpiar el DOM de backdrop-filters y transiciones que cuelgan a Chromium
-        this.hideModal();
-
-        
-        // Esperar a que la transición de cierre del modal termine (300ms) antes de abrir el diálogo de impresión
-        // Esperar a que termine la animación/cambio de UI antes de abrir el diálogo de impresión.
-        // Evita cuelgues en Chromium cuando hay transiciones/modal abierto/cambiando.
-        const fallbackTimeoutMs = 1200;
-        let didFire = false;
-
-        const safePrint = () => {
-            if (didFire) return;
-            didFire = true;
-            try {
-                window.print();
-            } catch (e) {
-                // Si por algún motivo falla print, no dejamos la app colgada.
-                console.error('window.print() failed', e);
-            }
-        };
-
-        // Fallback: aunque no haya transitionend.
-        const t = window.setTimeout(safePrint, fallbackTimeoutMs);
-
-        // Si hideModal dispara transiciones CSS, esperamos el transitionend de la modal (si existe).
-        const modalEl = document.querySelector('.modal-container');
-        if (modalEl) {
-            const onEnd = (ev: Event) => {
-                if (ev.target === modalEl || (ev as any).currentTarget === modalEl) {
-                    window.clearTimeout(t);
-                    modalEl.removeEventListener('transitionend', onEnd);
-                    safePrint();
-                }
-            };
-            modalEl.addEventListener('transitionend', onEnd);
+        // En vez de mostrar/usar la vista previa (que puede colgar el hilo al renderizar),
+        // intentamos disparar la descarga/impresión directamente.
+        // Ocultamos modal solo si existe para no romper la app.
+        try {
+            this.hideModal();
+        } catch (_) {
+            // no bloqueamos el flujo si hideModal falla
         }
+
+        // Disparar impresión directo y de forma segura.
+        // Evitamos esperas por transiciones para reducir probabilidad de freeze.
+        try {
+            window.print();
+        } catch (e) {
+            console.error('window.print() failed', e);
+        }
+
 
     } else {
         window.print();
