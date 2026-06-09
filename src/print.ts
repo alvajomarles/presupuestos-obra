@@ -33,11 +33,17 @@ ObraUI.prototype.printBudget = function(this: ObraUI) {
         this.modalFooterBeforePrint = document.getElementById('modal-footer')!.innerHTML;
         this.modalIsLargeBeforePrint = document.querySelector('.modal-container')!.classList.contains('large-modal');
 
-        // Copiar el contenido al contenedor aislado de impresión
-        printContainer.innerHTML = printableArea.innerHTML;
-        
+        // Copiar el contenido al contenedor aislado de impresión.
+        // Importante: clonar nodos en vez de usar innerHTML puede reducir trabajo
+        // de parseo/reejecución de estilos y minimizar freezes en Chromium.
+        // (Luego window.print() se dispara con la UI ya establecida.)
+        while (printContainer.firstChild) printContainer.removeChild(printContainer.firstChild);
+        const clone = printableArea.cloneNode(true) as HTMLElement;
+        printContainer.appendChild(clone);
+
         // Ocultar modal para limpiar el DOM de backdrop-filters y transiciones que cuelgan a Chromium
         this.hideModal();
+
         
         // Esperar a que la transición de cierre del modal termine (300ms) antes de abrir el diálogo de impresión
         // Esperar a que termine la animación/cambio de UI antes de abrir el diálogo de impresión.
