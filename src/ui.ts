@@ -1,11 +1,12 @@
-"use strict";
 // Manejo de Interfaz de Usuario, tablas dinámicas, modales y renderizado SPA
+
 class ObraUI {
-    activeTab;
-    currentChart;
-    budgetBuilderItems;
-    apuBuilderMateriales;
-    apuBuilderManoObra;
+    activeTab: string;
+    currentChart: any;
+    budgetBuilderItems: any[];
+    apuBuilderMateriales: any[];
+    apuBuilderManoObra: any[];
+
     constructor() {
         this.activeTab = 'dashboard';
         this.currentChart = null;
@@ -13,33 +14,36 @@ class ObraUI {
         this.apuBuilderMateriales = []; // Almacena materiales en edición de APU
         this.apuBuilderManoObra = []; // Almacena mano de obra en edición de APU
     }
+
     // --- ENRUTADOR LOCAL (TAB SWITCHING) ---
     switchTab(tabId) {
         this.activeTab = tabId;
+        
         // Destruir gráfico activo preventivamente si cambiamos de pestaña para evitar observers huérfanos
         if (tabId !== 'dashboard' && this.currentChart) {
             try {
                 this.currentChart.destroy();
                 this.currentChart = null;
-            }
-            catch (e) {
+            } catch (e) {
                 console.error("Error al destruir el gráfico al cambiar de pestaña:", e);
             }
         }
+        
         // Actualizar UI del menú lateral
         document.querySelectorAll('.nav-item').forEach(item => {
-            if (item.dataset.tab === tabId) {
+            if ((item as HTMLElement).dataset.tab === tabId) {
                 item.classList.add('active');
-            }
-            else {
+            } else {
                 item.classList.remove('active');
             }
         });
+
         // Renderizar vista correspondiente
-        const contentContainer = document.getElementById('view-content');
+        const contentContainer = document.getElementById('view-content')!;
         contentContainer.innerHTML = '<div class="loading">Cargando...</div>';
+
         setTimeout(() => {
-            switch (tabId) {
+            switch(tabId) {
                 case 'dashboard':
                     this.renderDashboard(contentContainer);
                     break;
@@ -65,18 +69,22 @@ class ObraUI {
             lucide.createIcons();
         }, 50);
     }
+
     // --- RENDER DASHBOARD ---
     renderDashboard(container) {
         const budgets = window.db.getBudgets();
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
         const apus = window.db.getApuItems();
+
         const totalPresupuestos = budgets.length;
         const totalAprobados = budgets.filter(b => b.estado === 'Aprobado').length;
+        
         // Calcular volumen total presupuestado histórico
         const totalFacturadoHistorico = budgets
             .filter(b => b.estado === 'Aprobado' || b.estado === 'Enviado')
             .reduce((sum, b) => sum + b.total, 0);
+
         container.innerHTML = `
             <div class="view-header">
                 <div>
@@ -196,38 +204,43 @@ class ObraUI {
                 </div>
             </div>
         `;
+
         this.renderInventoryChart(materials, labor, apus);
     }
+
     renderInventoryChart(materials, labor, apus) {
-        const ctx = document.getElementById('inventoryChart').getContext('2d');
+        const ctx = (document.getElementById('inventoryChart') as HTMLCanvasElement).getContext('2d')!;
         if (this.currentChart) {
             this.currentChart.destroy();
         }
+
         // Categorías de materiales más comunes
         const catMap = {};
         materials.forEach(m => {
             catMap[m.categoria] = (catMap[m.categoria] || 0) + 1;
         });
+
         const labels = ['M. Obra', ...Object.keys(catMap)];
         const data = [labor.length, ...Object.values(catMap)];
+
         this.currentChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
-                        data: data,
-                        backgroundColor: [
-                            '#6366f1', // Indigo
-                            '#10b981', // Emerald
-                            '#3b82f6', // Blue
-                            '#f59e0b', // Amber
-                            '#ec4899', // Pink
-                            '#8b5cf6', // Violet
-                            '#14b8a6' // Teal
-                        ],
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.05)'
-                    }]
+                    data: data,
+                    backgroundColor: [
+                        '#6366f1', // Indigo
+                        '#10b981', // Emerald
+                        '#3b82f6', // Blue
+                        '#f59e0b', // Amber
+                        '#ec4899', // Pink
+                        '#8b5cf6', // Violet
+                        '#14b8a6'  // Teal
+                    ],
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.05)'
+                }]
             },
             options: {
                 responsive: true,
@@ -247,9 +260,11 @@ class ObraUI {
             }
         });
     }
+
     // --- VIEW BUDGETS ---
     renderBudgets(container) {
         const budgets = window.db.getBudgets();
+
         container.innerHTML = `
             <div class="view-header">
                 <div>
@@ -304,6 +319,7 @@ class ObraUI {
             </div>
         `;
     }
+
     getBudgetsTableRows(budgets) {
         return budgets.reverse().map(b => `
             <tr data-id="${b.id}" data-search="${(b.cliente + ' ' + b.proyecto + ' ' + b.codigo).toLowerCase()}" data-estado="${b.estado}">
@@ -329,61 +345,74 @@ class ObraUI {
             </tr>
         `).join('') || '<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No se encontraron presupuestos.</td></tr>';
     }
+
     filterBudgets() {
-        const query = document.getElementById('budgetSearch').value.toLowerCase();
-        const status = document.getElementById('budgetStatusFilter').value;
+        const query = (document.getElementById('budgetSearch') as HTMLInputElement).value.toLowerCase();
+        const status = (document.getElementById('budgetStatusFilter') as HTMLSelectElement).value;
         const rows = document.querySelectorAll('#budgetsTable tbody tr');
+
         rows.forEach(row => {
-            const tr = row;
-            if (tr.cells.length === 1)
-                return; // skip row of empty items
+            const tr = row as HTMLTableRowElement;
+            if (tr.cells.length === 1) return; // skip row of empty items
             const searchData = tr.dataset.search || '';
             const rowStatus = tr.dataset.estado || '';
+            
             const matchesSearch = searchData.includes(query);
             const matchesStatus = !status || rowStatus === status;
+
             if (matchesSearch && matchesStatus) {
                 tr.style.display = '';
-            }
-            else {
+            } else {
                 tr.style.display = 'none';
             }
         });
     }
+
     deleteBudget(id) {
         if (confirm('¿Estás seguro de que quieres eliminar este presupuesto? Esta acción no se puede deshacer.')) {
             window.db.deleteBudget(id);
             this.switchTab('budgets');
         }
     }
+
     // --- VER DETALLES DE PRESUP    // --- VER DETALLES DE PRESUPUESTO & PDF PREVIEW ---
     viewBudgetDetails(id) {
         const budgets = window.db.getBudgets();
         const budget = budgets.find(b => b.id === id);
-        if (!budget)
-            return;
+        if (!budget) return;
+
         const comp = window.db.getCompanySettings();
         const colorPdf = comp.colorPdf || '#5b9bd5';
         const hasLogo = !!comp.logo;
         const logoPos = comp.logoPos || 'left';
         const isClasico = comp.templatePdf === 'clasico';
+        
         // Estilo del Logo
         const logoHtml = hasLogo ? `<img src="${comp.logo}" alt="Logo" style="max-height:55px; max-width:130px; object-fit:contain; border-radius:4px;">` : '';
+
         let bodyHtml = '';
+
         if (isClasico) {
             const obreros = budget.obreros || comp.obrerosPorDefecto || 2;
             const validez = budget.validez || comp.validezPorDefecto || '15 días';
             const totals = window.apuEngine.calculateBudgetTotals(budget.items, budget.margenGanancia, budget.impuestos);
+            
             const manoObraItems = budget.items.filter(item => item.manoObraCopia && item.manoObraCopia.length > 0);
             const materialesItems = budget.items.filter(item => !item.manoObraCopia || item.manoObraCopia.length === 0);
+            
             const totalHorasTrabajo = Math.round(manoObraItems.reduce((sum, item) => {
                 const itemLaborHoursPerUnit = (item.manoObraCopia || []).reduce((s, l) => s + (l.rendimiento || 0), 0);
                 return sum + (item.cantidad * itemLaborHoursPerUnit);
             }, 0));
+            
             const totalDias = totalHorasTrabajo > 0 ? Math.round((totalHorasTrabajo / (obreros * 8)) * 2) / 2 : 0;
+            
             const subtotalManoObra = manoObraItems.reduce((sum, item) => sum + (item.cantidad * item.precioUnitarioHistorico), 0);
             const subtotalMateriales = materialesItems.reduce((sum, item) => sum + (item.cantidad * item.precioUnitarioHistorico), 0);
+
             // Estructura de encabezado clásica
             const logoHtmlClasico = hasLogo ? `<img src="${comp.logo}" alt="Logo" style="max-height:60px; max-width:140px; object-fit:contain; border-radius:4px;">` : '';
+            
             bodyHtml = `
                 <style>
                     /* Estilos para simulación de cuadrícula Excel */
@@ -528,9 +557,9 @@ class ObraUI {
                         <tbody>
                             <!-- Grupo Mano de Obra -->
                             ${manoObraItems.map((item, idx) => {
-                const itemLaborHoursPerUnit = (item.manoObraCopia || []).reduce((s, l) => s + (l.rendimiento || 0), 0);
-                const totalItemLaborHours = Math.round(item.cantidad * itemLaborHoursPerUnit);
-                return `
+                                const itemLaborHoursPerUnit = (item.manoObraCopia || []).reduce((s, l) => s + (l.rendimiento || 0), 0);
+                                const totalItemLaborHours = Math.round(item.cantidad * itemLaborHoursPerUnit);
+                                return `
                                     <tr>
                                         <td style="font-weight:bold; color:#5b9bd5;">[MANO DE OBRA]</td>
                                         <td style="font-weight:500;">${item.nombre}</td>
@@ -541,11 +570,11 @@ class ObraUI {
                                         <td style="text-align: right; font-weight:500;">${totalItemLaborHours}</td>
                                     </tr>
                                 `;
-            }).join('')}
+                            }).join('')}
                             
                             <!-- Separador de Materiales -->
                             ${materialesItems.length > 0 ? materialesItems.map((item, idx) => {
-                return `
+                                return `
                                     <tr>
                                         <td style="font-weight:bold; color:#10b981;">[MATERIALES]</td>
                                         <td style="font-weight:500;">${item.nombre}</td>
@@ -556,7 +585,7 @@ class ObraUI {
                                         <td style="text-align: right;">-</td>
                                     </tr>
                                 `;
-            }).join('') : `
+                            }).join('') : `
                                 <tr>
                                     <td style="font-weight:bold; color:#4b5563;">[MATERIALES]</td>
                                     <td colspan="6" style="color:#9ca3af; font-style:italic; text-align:center; height:35px;">(Ningún material adicional cargado directamente en esta cotización)</td>
@@ -670,8 +699,7 @@ class ObraUI {
                     `).join('')}
                 </div>
             `;
-        }
-        else {
+        } else {
             // Estructura de información de empresa
             const companyInfoHtml = `
                 <div style="text-align: left;">
@@ -684,8 +712,10 @@ class ObraUI {
                     </div>
                 </div>
             `;
+
             let headerLeftHtml = '';
             let headerRightHtml = '';
+
             if (logoPos === 'right') {
                 headerLeftHtml = companyInfoHtml;
                 headerRightHtml = `
@@ -697,8 +727,7 @@ class ObraUI {
                         </div>
                     </div>
                 `;
-            }
-            else {
+            } else {
                 headerLeftHtml = `
                     <div style="display:flex; align-items:center; gap:16px;">
                         ${logoHtml}
@@ -712,6 +741,7 @@ class ObraUI {
                     </div>
                 `;
             }
+
             bodyHtml = `
                 <div id="printable-area" style="--pdf-primary-color: ${colorPdf};">
                     <!-- Encabezado del Presupuesto (Dinámico) -->
@@ -835,6 +865,7 @@ class ObraUI {
                 </div>
             `;
         }
+
         const footerHtml = `
             <div style="display:flex; justify-content:space-between; width:100%;">
                 <div>
@@ -853,9 +884,11 @@ class ObraUI {
                 </div>
             </div>
         `;
+
         this.showModal(`Detalle de Presupuesto - ${budget.codigo}`, bodyHtml, footerHtml, true);
         lucide.createIcons();
     }
+
     updateBudgetPlanning(id, workers, validity) {
         const budgets = window.db.getBudgets();
         const budget = budgets.find(b => b.id === id);
@@ -863,40 +896,47 @@ class ObraUI {
             budget.obreros = parseInt(workers) || 2;
             budget.validez = validity.trim();
             window.db.saveBudget(budget);
+            
             // Recargar detalles en tiempo real en la pantalla sin cerrar el modal
             this.viewBudgetDetails(id);
+
             // Refrescar vistas en el fondo
             if (this.activeTab === 'budgets') {
                 this.renderBudgets(document.getElementById('view-content'));
-            }
-            else if (this.activeTab === 'dashboard') {
+            } else if (this.activeTab === 'dashboard') {
                 this.renderDashboard(document.getElementById('view-content'));
             }
             lucide.createIcons();
         }
     }
+
     updateBudgetStatus(id, newStatus) {
         const budgets = window.db.getBudgets();
         const budget = budgets.find(b => b.id === id);
         if (budget) {
             budget.estado = newStatus;
             window.db.saveBudget(budget);
+            
             // Refrescar tabla en el fondo
             if (this.activeTab === 'budgets') {
                 this.renderBudgets(document.getElementById('view-content'));
-            }
-            else if (this.activeTab === 'dashboard') {
+            } else if (this.activeTab === 'dashboard') {
                 this.renderDashboard(document.getElementById('view-content'));
             }
             lucide.createIcons();
         }
     }
+
+
+
     // --- WIZARD / BUILDER DE PRESUPUESTOS ---
     openNewBudgetWizard() {
         const apus = window.db.getApuItems();
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
+
         this.budgetBuilderItems = []; // Resetear ítems
+
         const bodyHtml = `
             <div class="budget-builder-layout">
                 <!-- Formulario General e Ítems -->
@@ -1006,27 +1046,32 @@ class ObraUI {
                 </div>
             </div>
         `;
+
         const footerHtml = `
             <div class="flex-gap-12">
                 <button class="btn btn-secondary" onclick="window.ui.hideModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="window.ui.saveNewBudget()">Guardar Presupuesto</button>
             </div>
         `;
+
         this.showModal('Nuevo Presupuesto de Obra', bodyHtml, footerHtml, true);
         this.addEmptyBuilderItemRow(); // Iniciar con una fila vacía
         lucide.createIcons();
     }
+
     addEmptyBuilderItemRow() {
-        const tableBody = document.getElementById('builderItemsTableBody');
+        const tableBody = document.getElementById('builderItemsTableBody')!;
         const apus = window.db.getApuItems();
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
+
         const rowIndex = this.budgetBuilderItems.length;
         this.budgetBuilderItems.push({
             itemApuId: '',
             cantidad: 1,
             precioUnitario: 0
         });
+
         const tr = document.createElement('tr');
         tr.id = `bldRow-${rowIndex}`;
         tr.innerHTML = `
@@ -1057,10 +1102,12 @@ class ObraUI {
                 </button>
             </td>
         `;
+
         tableBody.appendChild(tr);
         lucide.createIcons();
     }
-    removeBuilderRow(index) {
+
+    removeBuilderRow(index: number) {
         const tr = document.getElementById(`bldRow-${index}`);
         if (tr) {
             tr.remove();
@@ -1068,63 +1115,76 @@ class ObraUI {
             this.calculateBuilderTotals();
         }
     }
-    onBuilderItemChange(index, apuId) {
-        if (!this.budgetBuilderItems[index])
-            return;
+
+    onBuilderItemChange(index: number, apuId: string) {
+        if (!this.budgetBuilderItems[index]) return;
         if (!apuId) {
             this.budgetBuilderItems[index].itemApuId = '';
             this.budgetBuilderItems[index].precioUnitario = 0;
-            document.getElementById(`bldUnit-${index}`).innerText = '-';
-            document.getElementById(`bldSubtotal-${index}`).innerText = '$0.00';
+            document.getElementById(`bldUnit-${index}`)!.innerText = '-';
+            document.getElementById(`bldSubtotal-${index}`)!.innerText = '$0.00';
             this.calculateBuilderTotals();
             return;
         }
+
         const apus = window.db.getApuItems();
         const apu = apus.find(a => a.id === apuId);
-        if (!apu)
-            return;
+        if (!apu) return;
+
         // Calcular precio unitario actual usando el APU Engine
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
         const apuPriceDetails = window.apuEngine.calculateItemPrice(apu, materials, labor);
+
         this.budgetBuilderItems[index].itemApuId = apuId;
         this.budgetBuilderItems[index].precioUnitario = apuPriceDetails.precioUnitario;
+
         // Actualizar UI
-        document.getElementById(`bldUnit-${index}`).innerText = apu.unidad;
-        const priceInput = document.querySelector(`#bldRow-${index} .bld-item-price`);
+        document.getElementById(`bldUnit-${index}`)!.innerText = apu.unidad;
+        const priceInput = document.querySelector(`#bldRow-${index} .bld-item-price`) as HTMLInputElement;
         priceInput.value = (Math.round(apuPriceDetails.precioUnitario * 100) / 100).toString();
+
         // Calcular subtotal de fila
-        const qty = parseFloat(document.querySelector(`#bldRow-${index} .bld-item-qty`).value) || 0;
+        const qty = parseFloat((document.querySelector(`#bldRow-${index} .bld-item-qty`) as HTMLInputElement).value) || 0;
         const rowSubtotal = qty * apuPriceDetails.precioUnitario;
-        document.getElementById(`bldSubtotal-${index}`).innerText = `$${this.formatCurrency(rowSubtotal)}`;
+        document.getElementById(`bldSubtotal-${index}`)!.innerText = `$${this.formatCurrency(rowSubtotal)}`;
+
         // Mostrar Guía de Precios Históricos para este rubro
         this.showHistoricalPriceHelper(apuId, apuPriceDetails.precioUnitario);
+
         this.calculateBuilderTotals();
     }
-    onBuilderQtyChange(index, value) {
-        if (!this.budgetBuilderItems[index])
-            return;
+
+    onBuilderQtyChange(index: number, value: any) {
+        if (!this.budgetBuilderItems[index]) return;
         const qty = parseFloat(value) || 0;
         this.budgetBuilderItems[index].cantidad = qty;
+        
         const price = this.budgetBuilderItems[index].precioUnitario;
         const subtotal = qty * price;
-        document.getElementById(`bldSubtotal-${index}`).innerText = `$${this.formatCurrency(subtotal)}`;
+        document.getElementById(`bldSubtotal-${index}`)!.innerText = `$${this.formatCurrency(subtotal)}`;
+
         this.calculateBuilderTotals();
     }
-    onBuilderPriceChange(index, value) {
-        if (!this.budgetBuilderItems[index])
-            return;
+
+    onBuilderPriceChange(index: number, value: any) {
+        if (!this.budgetBuilderItems[index]) return;
         const price = parseFloat(value) || 0;
         this.budgetBuilderItems[index].precioUnitario = price;
+
         const qty = this.budgetBuilderItems[index].cantidad;
         const subtotal = qty * price;
-        document.getElementById(`bldSubtotal-${index}`).innerText = `$${this.formatCurrency(subtotal)}`;
+        document.getElementById(`bldSubtotal-${index}`)!.innerText = `$${this.formatCurrency(subtotal)}`;
+
         this.calculateBuilderTotals();
     }
-    showHistoricalPriceHelper(apuId, currentCalculatedPrice) {
+
+    showHistoricalPriceHelper(apuId: string, currentCalculatedPrice: number) {
         const budgets = window.db.getBudgets();
         const priceGuide = window.apuEngine.getPriceGuide(apuId, currentCalculatedPrice, budgets);
-        const container = document.getElementById('historicalPriceHelper');
+
+        const container = document.getElementById('historicalPriceHelper')!;
+        
         if (priceGuide.historial.length === 0) {
             container.innerHTML = `
                 <div style="background:rgba(99,102,241,0.05); padding:8px; border-radius:4px; border-left:3px solid var(--color-primary);">
@@ -1134,6 +1194,7 @@ class ObraUI {
             `;
             return;
         }
+
         container.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <div style="background:rgba(16,185,129,0.05); padding:8px; border-radius:4px; border-left:3px solid var(--color-accent);">
@@ -1158,6 +1219,7 @@ class ObraUI {
             </div>
         `;
     }
+
     calculateBuilderTotals() {
         let subtotal = 0;
         this.budgetBuilderItems.forEach(item => {
@@ -1165,51 +1227,62 @@ class ObraUI {
                 subtotal += item.cantidad * item.precioUnitario;
             }
         });
-        const margin = parseFloat(document.getElementById('bldMargin').value) || 0;
-        const taxes = parseFloat(document.getElementById('bldTaxes').value) || 0;
+
+        const margin = parseFloat((document.getElementById('bldMargin') as HTMLInputElement).value) || 0;
+        const taxes = parseFloat((document.getElementById('bldTaxes') as HTMLInputElement).value) || 0;
+
         const marginVal = subtotal * (margin / 100);
         const subtotalConMargin = subtotal + marginVal;
         const taxesVal = subtotalConMargin * (taxes / 100);
         const total = subtotalConMargin + taxesVal;
-        document.getElementById('bldSubtotalVal').innerText = `$${this.formatCurrency(subtotal)}`;
-        document.getElementById('bldMarginVal').innerText = `$${this.formatCurrency(marginVal)}`;
-        document.getElementById('bldTaxesVal').innerText = `$${this.formatCurrency(taxesVal)}`;
-        document.getElementById('bldTotalVal').innerText = `$${this.formatCurrency(total)}`;
+
+        document.getElementById('bldSubtotalVal')!.innerText = `$${this.formatCurrency(subtotal)}`;
+        document.getElementById('bldMarginVal')!.innerText = `$${this.formatCurrency(marginVal)}`;
+        document.getElementById('bldTaxesVal')!.innerText = `$${this.formatCurrency(taxesVal)}`;
+        document.getElementById('bldTotalVal')!.innerText = `$${this.formatCurrency(total)}`;
     }
+
     saveNewBudget() {
-        const client = document.getElementById('bldClient').value.trim();
-        const project = document.getElementById('bldProject').value.trim();
-        const date = document.getElementById('bldDate').value;
-        const margin = parseFloat(document.getElementById('bldMargin').value) || 0;
-        const taxes = parseFloat(document.getElementById('bldTaxes').value) || 0;
+        const client = (document.getElementById('bldClient') as HTMLInputElement).value.trim();
+        const project = (document.getElementById('bldProject') as HTMLInputElement).value.trim();
+        const date = (document.getElementById('bldDate') as HTMLInputElement).value;
+        const margin = parseFloat((document.getElementById('bldMargin') as HTMLInputElement).value) || 0;
+        const taxes = parseFloat((document.getElementById('bldTaxes') as HTMLInputElement).value) || 0;
+
         if (!client || !project || !date) {
             alert('Por favor completa todos los campos del encabezado (Cliente, Proyecto y Fecha).');
             return;
         }
+
         // Filtrar ítems vacíos y armar lista final con copia del APU
         const apus = window.db.getApuItems();
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
-        const itemsFinal = [];
+
+        const itemsFinal: BudgetItem[] = [];
+        
         for (let item of this.budgetBuilderItems) {
             if (item && item.itemApuId) {
                 const apu = apus.find(a => a.id === item.itemApuId);
-                if (!apu)
-                    continue;
+                if (!apu) continue;
+
                 // Crear copia detallada del desglose de este APU en este momento
                 const priceDetails = window.apuEngine.calculateItemPrice(apu, materials, labor);
+                
                 const materialesCopia = priceDetails.materiales.map(m => ({
                     nombre: m.nombre,
                     unidad: m.unidad,
                     rendimiento: m.rendimiento,
                     precioUnitario: m.precioUnitario
                 }));
+
                 const manoObraCopia = priceDetails.manoDeObra.map(l => ({
                     nombre: l.nombre,
                     unidad: l.unidad,
                     rendimiento: l.rendimiento,
                     precioUnitario: l.precioUnitario
                 }));
+
                 itemsFinal.push({
                     id: 'item-bld-' + Date.now() + Math.random().toString(36).substr(2, 5),
                     itemApuId: item.itemApuId,
@@ -1223,18 +1296,21 @@ class ObraUI {
                 });
             }
         }
+
         if (itemsFinal.length === 0) {
             alert('Por favor agrega al menos un ítem / rubro válido con su precio.');
             return;
         }
+
         // Calcular totales finales
         const totals = window.apuEngine.calculateBudgetTotals(itemsFinal, margin, taxes);
-        const newBudget = {
+
+        const newBudget: Budget = {
             cliente: client,
             proyecto: project,
             fecha: date,
-            validez: document.getElementById('bldValidity').value.trim() || '15 días',
-            obreros: parseInt(document.getElementById('bldWorkers').value) || 2,
+            validez: (document.getElementById('bldValidity') as HTMLInputElement).value.trim() || '15 días',
+            obreros: parseInt((document.getElementById('bldWorkers') as HTMLInputElement).value) || 2,
             estado: 'Borrador',
             items: itemsFinal,
             subtotal: totals.subtotal,
@@ -1242,10 +1318,12 @@ class ObraUI {
             impuestos: taxes,
             total: totals.total
         };
+
         window.db.saveBudget(newBudget);
         this.hideModal();
         this.switchTab('budgets');
     }
+
     // --- WIZARD PARA SUBIR / IMPORTAR PRESUPUESTO ---
     openImportBudgetWizard() {
         const bodyHtml = `
@@ -1280,58 +1358,66 @@ class ObraUI {
                 </div>
             </div>
         `;
+
         const footerHtml = `
             <div class="flex-gap-12">
                 <button class="btn btn-secondary" onclick="window.ui.hideModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="window.ui.parseAndImportTextBudget()">Procesar e Importar</button>
             </div>
         `;
+
         this.showModal('Subir e Importar Presupuesto', bodyHtml, footerHtml);
         lucide.createIcons();
     }
-    handleJsonUpload(event) {
+
+    handleJsonUpload(event: any) {
         const file = event.target.files[0];
-        if (!file)
-            return;
+        if (!file) return;
+
         const reader = new FileReader();
         reader.onload = (e) => {
-            const content = e.target.result;
+            const content = (e.target as FileReader).result as string;
             const success = window.db.importData(content);
             if (success) {
                 alert('¡Base de datos y presupuestos importados con éxito!');
                 this.hideModal();
                 this.switchTab('dashboard');
-            }
-            else {
+            } else {
                 alert('Error: El archivo JSON no tiene un formato válido para este sistema.');
             }
         };
         reader.readAsText(file);
     }
+
     parseAndImportTextBudget() {
-        const text = document.getElementById('importPasteArea').value.trim();
-        const client = document.getElementById('impClient').value.trim() || 'Cliente Importado';
-        const project = document.getElementById('impProject').value.trim() || 'Obra Importada';
+        const text = (document.getElementById('importPasteArea') as HTMLTextAreaElement).value.trim();
+        const client = (document.getElementById('impClient') as HTMLInputElement).value.trim() || 'Cliente Importado';
+        const project = (document.getElementById('impProject') as HTMLInputElement).value.trim() || 'Obra Importada';
+
         if (!text) {
             alert('Por favor pega algunos ítems o carga un archivo JSON.');
             return;
         }
+
         const lines = text.split('\n');
-        const items = [];
+        const items: BudgetItem[] = [];
         const apuList = window.db.getApuItems();
+
         lines.forEach((line) => {
-            if (!line.trim())
-                return;
+            if (!line.trim()) return;
+
             // Separar por comas o tabuladores
             const parts = line.split(/,|\t/).map(p => p.trim());
-            if (parts.length < 2)
-                return;
+            if (parts.length < 2) return;
+
             const nombre = parts[0];
             const cantidad = parseFloat(parts[1]) || 1;
             const unidad = parts[2] || 'u';
             const precioUnitario = parseFloat(parts[3]) || 1000; // Valor por defecto
+
             // Verificar si el ítem APU ya existe, si no, crear uno genérico para guardarlo en la DB
             let apu = apuList.find(a => a.nombre.toLowerCase() === nombre.toLowerCase());
+            
             if (!apu) {
                 // Crear ítem APU base sin composición detallada para poblar la DB
                 apu = window.db.saveApuItem({
@@ -1343,9 +1429,10 @@ class ObraUI {
                     costoAdicionalPorcentaje: 0
                 });
             }
+
             items.push({
                 id: 'item-imp-' + Date.now() + Math.random().toString(36).substr(2, 5),
-                itemApuId: apu.id,
+                itemApuId: apu.id!,
                 nombre: apu.nombre,
                 unidad: apu.unidad,
                 cantidad: cantidad,
@@ -1355,13 +1442,15 @@ class ObraUI {
                 costoAdicionalPorcentaje: 0
             });
         });
+
         if (items.length === 0) {
             alert('No se pudo procesar ninguna línea. Revisa el formato.');
             return;
         }
+
         // Crear presupuesto
         const subtotal = items.reduce((sum, item) => sum + (item.cantidad * item.precioUnitarioHistorico), 0);
-        const newBudget = {
+        const newBudget: Budget = {
             cliente: client,
             proyecto: project,
             fecha: new Date().toISOString().split('T')[0],
@@ -1374,16 +1463,19 @@ class ObraUI {
             impuestos: 0,
             total: subtotal
         };
+
         window.db.saveBudget(newBudget);
         alert(`¡Presupuesto importado con éxito con ${items.length} ítems! Se han agregado los nuevos ítems a tu catálogo APU.`);
         this.hideModal();
         this.switchTab('budgets');
     }
+
     // --- RENDER ANALISIS DE PRECIOS UNITARIOS (APU) ---
     renderApu(container) {
         const apus = window.db.getApuItems();
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
+
         container.innerHTML = `
             <div class="view-header">
                 <div>
@@ -1412,8 +1504,8 @@ class ObraUI {
                         </thead>
                         <tbody>
                             ${apus.map(apu => {
-            const details = window.apuEngine.calculateItemPrice(apu, materials, labor);
-            return `
+                                const details = window.apuEngine.calculateItemPrice(apu, materials, labor);
+                                return `
                                     <tr>
                                         <td><strong>${apu.nombre}</strong></td>
                                         <td><span class="badge badge-indigo">${apu.categoria}</span></td>
@@ -1434,36 +1526,42 @@ class ObraUI {
                                         </td>
                                     </tr>
                                 `;
-        }).join('') || '<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No hay ítems APU creados.</td></tr>'}
+                            }).join('') || '<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No hay ítems APU creados.</td></tr>'}
                         </tbody>
                     </table>
                 </div>
             </div>
         `;
     }
+
     deleteApuItem(id) {
         if (confirm('¿Estás seguro de que deseas eliminar este ítem APU?')) {
             window.db.deleteApuItem(id);
             this.switchTab('apu');
         }
     }
+
     openNewApuWizard() {
         this.apuBuilderMateriales = [];
         this.apuBuilderManoObra = [];
         this.renderApuFormModal('Nuevo Análisis de Precio Unitario (APU)');
     }
+
     openEditApuWizard(id) {
         const apus = window.db.getApuItems();
         const apu = apus.find(a => a.id === id);
-        if (!apu)
-            return;
+        if (!apu) return;
+
         this.apuBuilderMateriales = (apu.materiales || []).map(m => ({ ...m }));
         this.apuBuilderManoObra = (apu.manoDeObra || []).map(l => ({ ...l }));
+        
         this.renderApuFormModal('Editar Análisis de Precio Unitario (APU)', apu);
     }
-    renderApuFormModal(title, apu = null) {
+
+    renderApuFormModal(title: string, apu: ApuItem | null = null) {
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
+
         const bodyHtml = `
             <div class="apu-editor-layout">
                 <!-- Estructura APU -->
@@ -1576,25 +1674,29 @@ class ObraUI {
                 </div>
             </div>
         `;
+
         const footerHtml = `
             <div class="flex-gap-12">
                 <button class="btn btn-secondary" onclick="window.ui.hideModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="window.ui.saveApuItem()">Guardar Cambios</button>
             </div>
         `;
+
         this.showModal(title, bodyHtml, footerHtml, true);
+
         // Poblar tablas con datos iniciales si es edición
         if (apu) {
             this.apuBuilderMateriales.forEach((m, idx) => this.renderApuMaterialRow(idx, m));
             this.apuBuilderManoObra.forEach((l, idx) => this.renderApuLaborRow(idx, l));
-        }
-        else {
+        } else {
             this.addApuMaterialRow();
             this.addApuLaborRow();
         }
+
         this.calculateApuTotals();
         lucide.createIcons();
     }
+
     addApuMaterialRow() {
         const idx = this.apuBuilderMateriales.length;
         const defaultRow = { materialId: '', rendimiento: 1 };
@@ -1602,9 +1704,11 @@ class ObraUI {
         this.renderApuMaterialRow(idx, defaultRow);
         lucide.createIcons();
     }
-    renderApuMaterialRow(index, data) {
-        const tableBody = document.getElementById('apuMaterialTableBody');
+
+    renderApuMaterialRow(index: number, data: any) {
+        const tableBody = document.getElementById('apuMaterialTableBody')!;
         const materials = window.db.getMaterials();
+
         const tr = document.createElement('tr');
         tr.id = `apuMatRow-${index}`;
         tr.innerHTML = `
@@ -1629,13 +1733,16 @@ class ObraUI {
                 </button>
             </td>
         `;
+
         tableBody.appendChild(tr);
+        
         // Cargar precios iniciales si ya tiene id asignado
         if (data.materialId) {
             this.onApuMaterialChange(index, data.materialId, false);
         }
     }
-    removeApuMaterialRow(index) {
+
+    removeApuMaterialRow(index: number) {
         const tr = document.getElementById(`apuMatRow-${index}`);
         if (tr) {
             tr.remove();
@@ -1643,43 +1750,48 @@ class ObraUI {
             this.calculateApuTotals();
         }
     }
-    onApuMaterialChange(index, materialId, triggerCalculate = true) {
-        if (!this.apuBuilderMateriales[index])
-            return;
+
+    onApuMaterialChange(index: number, materialId: string, triggerCalculate: boolean = true) {
+        if (!this.apuBuilderMateriales[index]) return;
         if (!materialId) {
             this.apuBuilderMateriales[index].materialId = '';
-            document.getElementById(`apuMatPrice-${index}`).innerText = '$0.00';
-            document.getElementById(`apuMatSub-${index}`).innerText = '$0.00';
-            if (triggerCalculate)
-                this.calculateApuTotals();
+            document.getElementById(`apuMatPrice-${index}`)!.innerText = '$0.00';
+            document.getElementById(`apuMatSub-${index}`)!.innerText = '$0.00';
+            if (triggerCalculate) this.calculateApuTotals();
             return;
         }
+
         const materials = window.db.getMaterials();
         const material = materials.find(m => m.id === materialId);
-        if (!material)
-            return;
+        if (!material) return;
+
         this.apuBuilderMateriales[index].materialId = materialId;
-        document.getElementById(`apuMatPrice-${index}`).innerText = `$${this.formatCurrency(material.precioUnitario)}`;
-        const qty = parseFloat(document.querySelector(`#apuMatRow-${index} .apu-mat-qty`).value) || 0;
+        
+        document.getElementById(`apuMatPrice-${index}`)!.innerText = `$${this.formatCurrency(material.precioUnitario)}`;
+        
+        const qty = parseFloat((document.querySelector(`#apuMatRow-${index} .apu-mat-qty`) as HTMLInputElement).value) || 0;
         const subtotal = qty * material.precioUnitario;
-        document.getElementById(`apuMatSub-${index}`).innerText = `$${this.formatCurrency(subtotal)}`;
-        if (triggerCalculate)
-            this.calculateApuTotals();
+        document.getElementById(`apuMatSub-${index}`)!.innerText = `$${this.formatCurrency(subtotal)}`;
+
+        if (triggerCalculate) this.calculateApuTotals();
     }
-    onApuMaterialQtyChange(index, value) {
-        if (!this.apuBuilderMateriales[index])
-            return;
+
+    onApuMaterialQtyChange(index: number, value: any) {
+        if (!this.apuBuilderMateriales[index]) return;
         const qty = parseFloat(value) || 0;
         this.apuBuilderMateriales[index].rendimiento = qty;
+
         const materialId = this.apuBuilderMateriales[index].materialId;
         if (materialId) {
             const materials = window.db.getMaterials();
             const material = materials.find(m => m.id === materialId);
             const subtotal = qty * (material ? material.precioUnitario : 0);
-            document.getElementById(`apuMatSub-${index}`).innerText = `$${this.formatCurrency(subtotal)}`;
+            document.getElementById(`apuMatSub-${index}`)!.innerText = `$${this.formatCurrency(subtotal)}`;
         }
+
         this.calculateApuTotals();
     }
+
     // Mano de Obra APU
     addApuLaborRow() {
         const idx = this.apuBuilderManoObra.length;
@@ -1688,9 +1800,11 @@ class ObraUI {
         this.renderApuLaborRow(idx, defaultRow);
         lucide.createIcons();
     }
-    renderApuLaborRow(index, data) {
-        const tableBody = document.getElementById('apuLaborTableBody');
+
+    renderApuLaborRow(index: number, data: any) {
+        const tableBody = document.getElementById('apuLaborTableBody')!;
         const labor = window.db.getLabor();
+
         const tr = document.createElement('tr');
         tr.id = `apuLabRow-${index}`;
         tr.innerHTML = `
@@ -1715,12 +1829,15 @@ class ObraUI {
                 </button>
             </td>
         `;
+
         tableBody.appendChild(tr);
+
         if (data.manoObraId) {
             this.onApuLaborChange(index, data.manoObraId, false);
         }
     }
-    removeApuLaborRow(index) {
+
+    removeApuLaborRow(index: number) {
         const tr = document.getElementById(`apuLabRow-${index}`);
         if (tr) {
             tr.remove();
@@ -1728,48 +1845,55 @@ class ObraUI {
             this.calculateApuTotals();
         }
     }
-    onApuLaborChange(index, laborId, triggerCalculate = true) {
-        if (!this.apuBuilderManoObra[index])
-            return;
+
+    onApuLaborChange(index: number, laborId: string, triggerCalculate: boolean = true) {
+        if (!this.apuBuilderManoObra[index]) return;
         if (!laborId) {
             this.apuBuilderManoObra[index].manoObraId = '';
-            document.getElementById(`apuLabPrice-${index}`).innerText = '$0.00';
-            document.getElementById(`apuLabSub-${index}`).innerText = '$0.00';
-            if (triggerCalculate)
-                this.calculateApuTotals();
+            document.getElementById(`apuLabPrice-${index}`)!.innerText = '$0.00';
+            document.getElementById(`apuLabSub-${index}`)!.innerText = '$0.00';
+            if (triggerCalculate) this.calculateApuTotals();
             return;
         }
+
         const labor = window.db.getLabor();
         const role = labor.find(l => l.id === laborId);
-        if (!role)
-            return;
+        if (!role) return;
+
         this.apuBuilderManoObra[index].manoObraId = laborId;
-        document.getElementById(`apuLabPrice-${index}`).innerText = `$${this.formatCurrency(role.precioUnitario)}`;
-        const qty = parseFloat(document.querySelector(`#apuLabRow-${index} .apu-lab-qty`).value) || 0;
+
+        document.getElementById(`apuLabPrice-${index}`)!.innerText = `$${this.formatCurrency(role.precioUnitario)}`;
+
+        const qty = parseFloat((document.querySelector(`#apuLabRow-${index} .apu-lab-qty`) as HTMLInputElement).value) || 0;
         const subtotal = qty * role.precioUnitario;
-        document.getElementById(`apuLabSub-${index}`).innerText = `$${this.formatCurrency(subtotal)}`;
-        if (triggerCalculate)
-            this.calculateApuTotals();
+        document.getElementById(`apuLabSub-${index}`)!.innerText = `$${this.formatCurrency(subtotal)}`;
+
+        if (triggerCalculate) this.calculateApuTotals();
     }
-    onApuLaborQtyChange(index, value) {
-        if (!this.apuBuilderManoObra[index])
-            return;
+
+    onApuLaborQtyChange(index: number, value: any) {
+        if (!this.apuBuilderManoObra[index]) return;
         const qty = parseFloat(value) || 0;
         this.apuBuilderManoObra[index].rendimiento = qty;
+
         const laborId = this.apuBuilderManoObra[index].manoObraId;
         if (laborId) {
             const labor = window.db.getLabor();
             const role = labor.find(l => l.id === laborId);
             const subtotal = qty * (role ? role.precioUnitario : 0);
-            document.getElementById(`apuLabSub-${index}`).innerText = `$${this.formatCurrency(subtotal)}`;
+            document.getElementById(`apuLabSub-${index}`)!.innerText = `$${this.formatCurrency(subtotal)}`;
         }
+
         this.calculateApuTotals();
     }
+
     calculateApuTotals() {
         let matCost = 0;
         let labCost = 0;
+
         const materials = window.db.getMaterials();
         const labor = window.db.getLabor();
+
         this.apuBuilderMateriales.forEach(m => {
             if (m && m.materialId) {
                 const material = materials.find(x => x.id === m.materialId);
@@ -1778,6 +1902,7 @@ class ObraUI {
                 }
             }
         });
+
         this.apuBuilderManoObra.forEach(l => {
             if (l && l.manoObraId) {
                 const role = labor.find(x => x.id === l.manoObraId);
@@ -1786,30 +1911,36 @@ class ObraUI {
                 }
             }
         });
-        const extraPercent = parseFloat(document.getElementById('apuExtraPorcent').value) || 0;
+
+        const extraPercent = parseFloat((document.getElementById('apuExtraPorcent') as HTMLInputElement).value) || 0;
         const directCost = matCost + labCost;
         const extraCost = directCost * (extraPercent / 100);
         const finalPrice = directCost + extraCost;
-        document.getElementById('apuSubMaterial').innerText = `$${this.formatCurrency(matCost)}`;
-        document.getElementById('apuSubLabor').innerText = `$${this.formatCurrency(labCost)}`;
-        document.getElementById('apuCostoDirecto').innerText = `$${this.formatCurrency(directCost)}`;
-        document.getElementById('apuCostoExtra').innerText = `$${this.formatCurrency(extraCost)}`;
-        document.getElementById('apuFinalPriceVal').innerText = `$${this.formatCurrency(finalPrice)}`;
+
+        document.getElementById('apuSubMaterial')!.innerText = `$${this.formatCurrency(matCost)}`;
+        document.getElementById('apuSubLabor')!.innerText = `$${this.formatCurrency(labCost)}`;
+        document.getElementById('apuCostoDirecto')!.innerText = `$${this.formatCurrency(directCost)}`;
+        document.getElementById('apuCostoExtra')!.innerText = `$${this.formatCurrency(extraCost)}`;
+        document.getElementById('apuFinalPriceVal')!.innerText = `$${this.formatCurrency(finalPrice)}`;
     }
+
     saveApuItem() {
-        const id = document.getElementById('apuId').value;
-        const nombre = document.getElementById('apuName').value.trim();
-        const categoria = document.getElementById('apuCategory').value.trim();
-        const unidad = document.getElementById('apuUnit').value.trim();
-        const extraPorcent = parseFloat(document.getElementById('apuExtraPorcent').value) || 0;
+        const id = (document.getElementById('apuId') as HTMLInputElement).value;
+        const nombre = (document.getElementById('apuName') as HTMLInputElement).value.trim();
+        const categoria = (document.getElementById('apuCategory') as HTMLInputElement).value.trim();
+        const unidad = (document.getElementById('apuUnit') as HTMLInputElement).value.trim();
+        const extraPorcent = parseFloat((document.getElementById('apuExtraPorcent') as HTMLInputElement).value) || 0;
+
         if (!nombre || !categoria || !unidad) {
             alert('Por favor completa las propiedades base del ítem (Nombre, Categoría y Unidad).');
             return;
         }
+
         // Filtrar nulos
         const materiales = this.apuBuilderMateriales.filter(m => m && m.materialId);
         const manoDeObra = this.apuBuilderManoObra.filter(l => l && l.manoObraId);
-        const apuData = {
+
+        const apuData: Omit<ApuItem, 'id'> & { id?: string } = {
             id: id || undefined,
             nombre,
             categoria,
@@ -1818,13 +1949,16 @@ class ObraUI {
             manoDeObra,
             costoAdicionalPorcentaje: extraPorcent
         };
+
         window.db.saveApuItem(apuData);
         this.hideModal();
         this.switchTab('apu');
     }
+
     // --- RENDER MATERIALES ---
     renderMaterials(container) {
         const materials = window.db.getMaterials();
+
         container.innerHTML = `
             <div class="view-header">
                 <div>
@@ -1875,18 +2009,21 @@ class ObraUI {
             </div>
         `;
     }
+
     deleteMaterial(id) {
         if (confirm('¿Deseas eliminar este material? Si está asignado a un APU, los costos de ese APU podrían recalcularse como cero.')) {
             window.db.deleteMaterial(id);
             this.switchTab('materials');
         }
     }
-    openMaterialModal(id = null) {
-        let material = null;
+
+    openMaterialModal(id: string | null = null) {
+        let material: Material | null = null;
         if (id) {
             const list = window.db.getMaterials();
             material = list.find(m => m.id === id) || null;
         }
+
         const bodyHtml = `
             <input type="hidden" id="matId" value="${material ? material.id : ''}">
             <div class="form-group">
@@ -1908,25 +2045,30 @@ class ObraUI {
                 <input type="number" id="matPrice" value="${material ? material.precioUnitario : ''}" placeholder="e.g. 8500" step="any" required>
             </div>
         `;
+
         const footerHtml = `
             <div class="flex-gap-12">
                 <button class="btn btn-secondary" onclick="window.ui.hideModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="window.ui.saveMaterial()">Guardar Material</button>
             </div>
         `;
+
         this.showModal(material ? 'Editar Material' : 'Nuevo Material', bodyHtml, footerHtml);
         lucide.createIcons();
     }
+
     saveMaterial() {
-        const id = document.getElementById('matId').value;
-        const nombre = document.getElementById('matName').value.trim();
-        const categoria = document.getElementById('matCategory').value.trim();
-        const unidad = document.getElementById('matUnit').value.trim();
-        const precioUnitario = parseFloat(document.getElementById('matPrice').value) || 0;
+        const id = (document.getElementById('matId') as HTMLInputElement).value;
+        const nombre = (document.getElementById('matName') as HTMLInputElement).value.trim();
+        const categoria = (document.getElementById('matCategory') as HTMLInputElement).value.trim();
+        const unidad = (document.getElementById('matUnit') as HTMLInputElement).value.trim();
+        const precioUnitario = parseFloat((document.getElementById('matPrice') as HTMLInputElement).value) || 0;
+
         if (!nombre || !categoria || !unidad || isNaN(precioUnitario)) {
             alert('Por favor, completa todos los campos del formulario.');
             return;
         }
+
         window.db.saveMaterial({
             id: id || undefined,
             nombre,
@@ -1934,12 +2076,15 @@ class ObraUI {
             unidad,
             precioUnitario
         });
+
         this.hideModal();
         this.switchTab('materials');
     }
+
     // --- RENDER MANO DE OBRA ---
     renderLabor(container) {
         const labor = window.db.getLabor();
+
         container.innerHTML = `
             <div class="view-header">
                 <div>
@@ -1990,18 +2135,21 @@ class ObraUI {
             </div>
         `;
     }
+
     deleteLabor(id) {
         if (confirm('¿Deseas eliminar este rol de mano de obra? Si está asignado a un APU, los costos de ese APU podrían recalcularse como cero.')) {
             window.db.deleteLabor(id);
             this.switchTab('labor');
         }
     }
-    openLaborModal(id = null) {
-        let labor = null;
+
+    openLaborModal(id: string | null = null) {
+        let labor: Labor | null = null;
         if (id) {
             const list = window.db.getLabor();
             labor = list.find(l => l.id === id) || null;
         }
+
         const bodyHtml = `
             <input type="hidden" id="labId" value="${labor ? labor.id : ''}">
             <div class="form-group">
@@ -2023,25 +2171,30 @@ class ObraUI {
                 <input type="number" id="labPrice" value="${labor ? labor.precioUnitario : ''}" placeholder="e.g. 3500" step="any" required>
             </div>
         `;
+
         const footerHtml = `
             <div class="flex-gap-12">
                 <button class="btn btn-secondary" onclick="window.ui.hideModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="window.ui.saveLabor()">Guardar Rol</button>
             </div>
         `;
+
         this.showModal(labor ? 'Editar Mano de Obra' : 'Nueva Mano de Obra', bodyHtml, footerHtml);
         lucide.createIcons();
     }
+
     saveLabor() {
-        const id = document.getElementById('labId').value;
-        const nombre = document.getElementById('labName').value.trim();
-        const categoria = document.getElementById('labCategory').value.trim();
-        const unidad = document.getElementById('labUnit').value.trim();
-        const precioUnitario = parseFloat(document.getElementById('labPrice').value) || 0;
+        const id = (document.getElementById('labId') as HTMLInputElement).value;
+        const nombre = (document.getElementById('labName') as HTMLInputElement).value.trim();
+        const categoria = (document.getElementById('labCategory') as HTMLInputElement).value.trim();
+        const unidad = (document.getElementById('labUnit') as HTMLInputElement).value.trim();
+        const precioUnitario = parseFloat((document.getElementById('labPrice') as HTMLInputElement).value) || 0;
+
         if (!nombre || !categoria || !unidad || isNaN(precioUnitario)) {
             alert('Por favor, completa todos los campos del formulario.');
             return;
         }
+
         window.db.saveLabor({
             id: id || undefined,
             nombre,
@@ -2049,9 +2202,11 @@ class ObraUI {
             unidad,
             precioUnitario
         });
+
         this.hideModal();
         this.switchTab('labor');
     }
+
     // --- RENDER SETTINGS & HERRAMIENTAS ---
     renderSettings(container) {
         container.innerHTML = `
@@ -2092,15 +2247,19 @@ class ObraUI {
             </div>
         `;
     }
+
     exportDatabaseFile() {
         const dataStr = window.db.exportData();
-        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        
         const exportFileDefaultName = `obra_db_respaldo_${new Date().toISOString().split('T')[0]}.json`;
+        
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', exportFileDefaultName);
         linkElement.click();
     }
+
     resetDatabaseToDefaults() {
         if (confirm('¿Estás seguro de reiniciar la base de datos? Esto eliminará todos los presupuestos y materiales que hayas creado y restablecerá los ejemplos de fábrica.')) {
             window.db.resetDatabase();
@@ -2108,31 +2267,38 @@ class ObraUI {
             this.switchTab('dashboard');
         }
     }
+
     // --- NUEVA PESTAÑA: PERSONALIZACIÓN DE PDF EN VIVO ---
     // Métodos migrados a src/print.ts (ex-renderPdfSettings, ex-updateLivePdfPreview, ex-saveCompanyProfile)
+
+
     // --- MODALES HELPERS ---
-    showModal(title, bodyHtml, footerHtml = '', isLarge = false) {
-        const overlay = document.getElementById('modal-overlay');
-        const container = document.querySelector('.modal-container');
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-body').innerHTML = bodyHtml;
-        document.getElementById('modal-footer').innerHTML = footerHtml;
+    showModal(title: string, bodyHtml: string, footerHtml: string = '', isLarge: boolean = false) {
+        const overlay = document.getElementById('modal-overlay')!;
+        const container = document.querySelector('.modal-container')!;
+        
+        document.getElementById('modal-title')!.innerText = title;
+        document.getElementById('modal-body')!.innerHTML = bodyHtml;
+        document.getElementById('modal-footer')!.innerHTML = footerHtml;
+
         if (isLarge) {
             container.classList.add('large-modal');
-        }
-        else {
+        } else {
             container.classList.remove('large-modal');
         }
+
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden'; // Evitar scroll de fondo
     }
+
     hideModal() {
-        const overlay = document.getElementById('modal-overlay');
-        const container = document.querySelector('.modal-container');
+        const overlay = document.getElementById('modal-overlay')!;
+        const container = document.querySelector('.modal-container')!;
         overlay.classList.remove('active');
         container.classList.remove('large-modal');
         document.body.style.overflow = ''; // Restaurar scroll
     }
+
     // --- HELPERS GENERALES ---
     formatCurrency(value) {
         return Number(value).toLocaleString('es-AR', {
@@ -2140,8 +2306,9 @@ class ObraUI {
             maximumFractionDigits: 2
         });
     }
+
     getStatusBadgeClass(status) {
-        switch (status) {
+        switch(status) {
             case 'Borrador': return 'badge-secondary';
             case 'Enviado': return 'badge-indigo';
             case 'Aprobado': return 'badge-emerald';
@@ -2150,5 +2317,6 @@ class ObraUI {
         }
     }
 }
+
 const ui = new ObraUI();
 window.ui = ui;

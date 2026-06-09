@@ -1,6 +1,6 @@
-"use strict";
 // Capa de base de datos local usando LocalStorage
 // Proveedor de persistencia y datos iniciales (semilla)
+
 const STORAGE_KEYS = {
     MATERIALS: 'obra_db_materials',
     LABOR: 'obra_db_labor',
@@ -8,8 +8,9 @@ const STORAGE_KEYS = {
     BUDGETS: 'obra_db_budgets',
     COMPANY: 'obra_db_company'
 };
+
 // Datos Semilla Iniciales
-const DEFAULT_MATERIALS = [
+const DEFAULT_MATERIALS: Material[] = [
     { id: 'mat-1', nombre: 'Cemento Portland (bolsa 50kg)', unidad: 'bolsa', precioUnitario: 8500, categoria: 'Aglomerantes', fechaActualizacion: '2026-05-25' },
     { id: 'mat-2', nombre: 'Arena gruesa', unidad: 'm3', precioUnitario: 12000, categoria: 'Áridos', fechaActualizacion: '2026-05-25' },
     { id: 'mat-3', nombre: 'Piedra partida 1-3', unidad: 'm3', precioUnitario: 15000, categoria: 'Áridos', fechaActualizacion: '2026-05-25' },
@@ -19,26 +20,28 @@ const DEFAULT_MATERIALS = [
     { id: 'mat-7', nombre: 'Cable unipolar 2.5 mm2', unidad: 'm', precioUnitario: 450, categoria: 'Electricidad', fechaActualizacion: '2026-05-25' },
     { id: 'mat-8', nombre: 'Pintura Látex Exterior (20L)', unidad: 'lata', precioUnitario: 65000, categoria: 'Pinturas', fechaActualizacion: '2026-05-25' }
 ];
-const DEFAULT_LABOR = [
+
+const DEFAULT_LABOR: Labor[] = [
     { id: 'lab-1', nombre: 'Oficial Albañil', unidad: 'hora', precioUnitario: 3500, categoria: 'Albañilería', fechaActualizacion: '2026-05-25' },
     { id: 'lab-2', nombre: 'Ayudante de Albañilería', unidad: 'hora', precioUnitario: 2600, categoria: 'Albañilería', fechaActualizacion: '2026-05-25' },
     { id: 'lab-3', nombre: 'Oficial Electricista', unidad: 'hora', precioUnitario: 4000, categoria: 'Instalaciones', fechaActualizacion: '2026-05-25' },
     { id: 'lab-4', nombre: 'Oficial Pintor', unidad: 'hora', precioUnitario: 3200, categoria: 'Acabados', fechaActualizacion: '2026-05-25' }
 ];
-const DEFAULT_APU = [
+
+const DEFAULT_APU: ApuItem[] = [
     {
         id: 'apu-1',
         nombre: 'Mampostería de Ladrillo Común e=15cm',
         unidad: 'm2',
         categoria: 'Albañilería',
         materiales: [
-            { materialId: 'mat-1', rendimiento: 0.3 }, // Cemento (bolsa)
+            { materialId: 'mat-1', rendimiento: 0.3 },  // Cemento (bolsa)
             { materialId: 'mat-2', rendimiento: 0.04 }, // Arena (m3)
-            { materialId: 'mat-4', rendimiento: 0.06 } // Ladrillos (millar = 60 unidades)
+            { materialId: 'mat-4', rendimiento: 0.06 }  // Ladrillos (millar = 60 unidades)
         ],
         manoDeObra: [
             { manoObraId: 'lab-1', rendimiento: 1.5 }, // Oficial albañil (horas)
-            { manoObraId: 'lab-2', rendimiento: 1.5 } // Ayudante (horas)
+            { manoObraId: 'lab-2', rendimiento: 1.5 }  // Ayudante (horas)
         ],
         costoAdicionalPorcentaje: 5 // 5% para herramientas y desperdicio
     },
@@ -48,15 +51,15 @@ const DEFAULT_APU = [
         unidad: 'm3',
         categoria: 'Estructuras',
         materiales: [
-            { materialId: 'mat-1', rendimiento: 7.0 }, // Cemento (bolsa)
-            { materialId: 'mat-2', rendimiento: 0.5 }, // Arena (m3)
+            { materialId: 'mat-1', rendimiento: 7.0 },  // Cemento (bolsa)
+            { materialId: 'mat-2', rendimiento: 0.5 },  // Arena (m3)
             { materialId: 'mat-3', rendimiento: 0.75 }, // Piedra partida (m3)
-            { materialId: 'mat-5', rendimiento: 4.5 }, // Hierro ø 8mm (barras)
-            { materialId: 'mat-6', rendimiento: 8.0 } // Madera encofrado (pie2)
+            { materialId: 'mat-5', rendimiento: 4.5 },  // Hierro ø 8mm (barras)
+            { materialId: 'mat-6', rendimiento: 8.0 }   // Madera encofrado (pie2)
         ],
         manoDeObra: [
-            { manoObraId: 'lab-1', rendimiento: 8.0 }, // Oficial (horas)
-            { manoObraId: 'lab-2', rendimiento: 12.0 } // Ayudante (horas)
+            { manoObraId: 'lab-1', rendimiento: 8.0 },  // Oficial (horas)
+            { manoObraId: 'lab-2', rendimiento: 12.0 }  // Ayudante (horas)
         ],
         costoAdicionalPorcentaje: 8 // 8% de desperdicio/encofrado/herramientas
     },
@@ -66,15 +69,16 @@ const DEFAULT_APU = [
         unidad: 'u',
         categoria: 'Instalaciones',
         materiales: [
-            { materialId: 'mat-7', rendimiento: 15.0 } // Cable 2.5mm (m)
+            { materialId: 'mat-7', rendimiento: 15.0 }  // Cable 2.5mm (m)
         ],
         manoDeObra: [
-            { manoObraId: 'lab-3', rendimiento: 2.0 } // Oficial electricista (horas)
+            { manoObraId: 'lab-3', rendimiento: 2.0 }   // Oficial electricista (horas)
         ],
         costoAdicionalPorcentaje: 10
     }
 ];
-const DEFAULT_BUDGETS = [
+
+const DEFAULT_BUDGETS: Budget[] = [
     {
         id: 'bud-1',
         codigo: 'PRE-2026-001',
@@ -131,7 +135,8 @@ const DEFAULT_BUDGETS = [
         total: 2737777.5
     }
 ];
-const DEFAULT_COMPANY = {
+
+const DEFAULT_COMPANY: CompanySettings = {
     nombre: 'Construcciones Alvaro',
     subtitulo: 'Reformas Generales y Obras Civiles',
     email: 'info@construccionesalvaro.com',
@@ -145,11 +150,13 @@ const DEFAULT_COMPANY = {
     obrerosPorDefecto: 2,
     validezPorDefecto: '15 días'
 };
+
 class ObraDatabase {
     constructor() {
         this.initializeStorage();
     }
-    initializeStorage() {
+
+    initializeStorage(): void {
         if (!localStorage.getItem(STORAGE_KEYS.MATERIALS)) {
             localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(DEFAULT_MATERIALS));
         }
@@ -166,101 +173,110 @@ class ObraDatabase {
             localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(DEFAULT_COMPANY));
         }
     }
-    getCompanySettings() {
+
+    getCompanySettings(): CompanySettings {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANY) || '{}');
         return { ...DEFAULT_COMPANY, ...stored };
     }
-    saveCompanySettings(settings) {
+
+    saveCompanySettings(settings: CompanySettings): CompanySettings {
         localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(settings));
         return settings;
     }
+
     // --- MATERIALES ---
-    getMaterials() {
+    getMaterials(): Material[] {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.MATERIALS) || '[]');
     }
-    saveMaterial(material) {
+
+    saveMaterial(material: Partial<Material> & { nombre: string }): Material {
         const materials = this.getMaterials();
         if (material.id) {
             const index = materials.findIndex(m => m.id === material.id);
             if (index !== -1) {
                 materials[index] = { ...materials[index], ...material, fechaActualizacion: new Date().toISOString().split('T')[0] };
             }
-        }
-        else {
+        } else {
             material.id = 'mat-' + Date.now();
             material.fechaActualizacion = new Date().toISOString().split('T')[0];
-            materials.push(material);
+            materials.push(material as Material);
         }
         localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
-        return material;
+        return material as Material;
     }
-    deleteMaterial(id) {
+
+    deleteMaterial(id: string): void {
         let materials = this.getMaterials();
         materials = materials.filter(m => m.id !== id);
         localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
     }
+
     // --- MANO DE OBRA ---
-    getLabor() {
+    getLabor(): Labor[] {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR) || '[]');
     }
-    saveLabor(labor) {
+
+    saveLabor(labor: Partial<Labor> & { nombre: string }): Labor {
         const laborList = this.getLabor();
         if (labor.id) {
             const index = laborList.findIndex(l => l.id === labor.id);
             if (index !== -1) {
                 laborList[index] = { ...laborList[index], ...labor, fechaActualizacion: new Date().toISOString().split('T')[0] };
             }
-        }
-        else {
+        } else {
             labor.id = 'lab-' + Date.now();
             labor.fechaActualizacion = new Date().toISOString().split('T')[0];
-            laborList.push(labor);
+            laborList.push(labor as Labor);
         }
         localStorage.setItem(STORAGE_KEYS.LABOR, JSON.stringify(laborList));
-        return labor;
+        return labor as Labor;
     }
-    deleteLabor(id) {
+
+    deleteLabor(id: string): void {
         let laborList = this.getLabor();
         laborList = laborList.filter(l => l.id !== id);
         localStorage.setItem(STORAGE_KEYS.LABOR, JSON.stringify(laborList));
     }
+
     // --- ANALISIS DE PRECIOS UNITARIOS (APU) ---
-    getApuItems() {
+    getApuItems(): ApuItem[] {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.APU) || '[]');
     }
-    saveApuItem(apu) {
+
+    saveApuItem(apu: Partial<ApuItem> & { nombre: string }): ApuItem {
         const apuList = this.getApuItems();
         if (apu.id) {
             const index = apuList.findIndex(a => a.id === apu.id);
             if (index !== -1) {
-                apuList[index] = { ...apuList[index], ...apu };
+                apuList[index] = { ...apuList[index], ...apu } as ApuItem;
             }
-        }
-        else {
+        } else {
             apu.id = 'apu-' + Date.now();
-            apuList.push(apu);
+            apuList.push(apu as ApuItem);
         }
         localStorage.setItem(STORAGE_KEYS.APU, JSON.stringify(apuList));
-        return apu;
+        return apu as ApuItem;
     }
-    deleteApuItem(id) {
+
+    deleteApuItem(id: string): void {
         let apuList = this.getApuItems();
         apuList = apuList.filter(a => a.id !== id);
         localStorage.setItem(STORAGE_KEYS.APU, JSON.stringify(apuList));
     }
+
     // --- PRESUPUESTOS ---
-    getBudgets() {
+    getBudgets(): Budget[] {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.BUDGETS) || '[]');
     }
-    saveBudget(budget) {
+
+    saveBudget(budget: Budget): Budget {
         const budgets = this.getBudgets();
         if (budget.id) {
             const index = budgets.findIndex(b => b.id === budget.id);
             if (index !== -1) {
                 budgets[index] = { ...budgets[index], ...budget };
             }
-        }
-        else {
+        } else {
             budget.id = 'bud-' + Date.now();
             // Auto generate code if not present
             if (!budget.codigo) {
@@ -273,13 +289,15 @@ class ObraDatabase {
         localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(budgets));
         return budget;
     }
-    deleteBudget(id) {
+
+    deleteBudget(id: string): void {
         let budgets = this.getBudgets();
         budgets = budgets.filter(b => b.id !== id);
         localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(budgets));
     }
+
     // --- GESTIÓN GENERAL DE DATOS ---
-    exportData() {
+    exportData(): string {
         const data = {
             materials: this.getMaterials(),
             labor: this.getLabor(),
@@ -291,27 +309,23 @@ class ObraDatabase {
         };
         return JSON.stringify(data, null, 2);
     }
-    importData(jsonData) {
+
+    importData(jsonData: string): boolean {
         try {
             const data = JSON.parse(jsonData);
-            if (data.materials)
-                localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(data.materials));
-            if (data.labor)
-                localStorage.setItem(STORAGE_KEYS.LABOR, JSON.stringify(data.labor));
-            if (data.apu)
-                localStorage.setItem(STORAGE_KEYS.APU, JSON.stringify(data.apu));
-            if (data.budgets)
-                localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(data.budgets));
-            if (data.company)
-                localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(data.company));
+            if (data.materials) localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(data.materials));
+            if (data.labor) localStorage.setItem(STORAGE_KEYS.LABOR, JSON.stringify(data.labor));
+            if (data.apu) localStorage.setItem(STORAGE_KEYS.APU, JSON.stringify(data.apu));
+            if (data.budgets) localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(data.budgets));
+            if (data.company) localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(data.company));
             return true;
-        }
-        catch (e) {
+        } catch (e) {
             console.error('Error importing data:', e);
             return false;
         }
     }
-    resetDatabase() {
+
+    resetDatabase(): void {
         localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(DEFAULT_MATERIALS));
         localStorage.setItem(STORAGE_KEYS.LABOR, JSON.stringify(DEFAULT_LABOR));
         localStorage.setItem(STORAGE_KEYS.APU, JSON.stringify(DEFAULT_APU));
@@ -319,6 +333,7 @@ class ObraDatabase {
         localStorage.setItem(STORAGE_KEYS.COMPANY, JSON.stringify(DEFAULT_COMPANY));
     }
 }
+
 // Exportar instancia global
 const db = new ObraDatabase();
 window.db = db;

@@ -5,3 +5,7 @@ Thumbs.db
 # Local test outputs or logs
 *.log
 .system_generated/
+
+# Node dependencies
+node_modules/
+

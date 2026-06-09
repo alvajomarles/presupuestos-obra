@@ -1,0 +1,13 @@
+{
+  "name": "presupuestos-obra",
+  "version": "1.0.0",
+  "description": "Software de presupuestos de obra con APU y plazos de obra",
+  "main": "index.html",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
