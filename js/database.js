@@ -127,6 +127,8 @@ const DEFAULT_BUDGETS = [
                 costoAdicionalPorcentaje: 5
             }
         ],
+        validez: '15 días',
+        obreros: 2,
         subtotal: 1967500,
         margenGanancia: 15,
         impuestos: 21,
@@ -141,9 +143,12 @@ const DEFAULT_COMPANY = {
     telefono: '+54 9 11 9876-5432',
     direccion: 'Calle Falsa 123, Buenos Aires',
     notasPie: '• Validez del presupuesto: 15 días.\n• El precio incluye materiales y mano de obra detallados.\n• Forma de pago: 50% de anticipo y 50% contra entrega o avance certificado.',
-    colorPdf: '#6366f1',
+    colorPdf: '#5b9bd5',
     logo: '',
-    logoPos: 'left'
+    logoPos: 'left',
+    templatePdf: 'clasico',
+    obrerosPorDefecto: 2,
+    validezPorDefecto: '15 días'
 };
 
 class ObraDatabase {
@@ -170,7 +175,8 @@ class ObraDatabase {
     }
 
     getCompanySettings() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANY)) || DEFAULT_COMPANY;
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANY)) || {};
+        return { ...DEFAULT_COMPANY, ...stored };
     }
 
     saveCompanySettings(settings) {

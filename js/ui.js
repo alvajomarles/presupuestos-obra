@@ -368,144 +368,290 @@ class ObraUI {
         }
     }
 
-    // --- VER DETALLES DE PRESUPUESTO & PDF PREVIEW ---
+    // --- VER DETALLES DE PRESUP    // --- VER DETALLES DE PRESUPUESTO & PDF PREVIEW ---
     viewBudgetDetails(id) {
         const budgets = window.db.getBudgets();
         const budget = budgets.find(b => b.id === id);
         if (!budget) return;
 
         const comp = window.db.getCompanySettings();
-        const colorPdf = comp.colorPdf || '#6366f1';
+        const colorPdf = comp.colorPdf || '#5b9bd5';
         const hasLogo = !!comp.logo;
         const logoPos = comp.logoPos || 'left';
+        const isClasico = comp.templatePdf === 'clasico';
         
         // Estilo del Logo
         const logoHtml = hasLogo ? `<img src="${comp.logo}" alt="Logo" style="max-height:55px; max-width:130px; object-fit:contain; border-radius:4px;">` : '';
 
-        // Estructura de información de empresa
-        const companyInfoHtml = `
-            <div style="text-align: left;">
-                <div style="font-size:1.3rem; font-weight:700; color:${colorPdf};">${comp.nombre}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted); font-weight:500;">${comp.subtitulo}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
-                    ${comp.direccion ? `📍 ${comp.direccion}` : ''}
-                    ${comp.telefono ? ` | 📞 ${comp.telefono}` : ''}
-                    ${comp.email ? ` | ✉️ ${comp.email}` : ''}
-                </div>
-            </div>
-        `;
+        let bodyHtml = '';
 
-        let headerLeftHtml = '';
-        let headerRightHtml = '';
+        if (isClasico) {
+            const obreros = budget.obreros || comp.obrerosPorDefecto || 2;
+            const validez = budget.validez || comp.validezPorDefecto || '15 días';
+            const totals = window.apuEngine.calculateBudgetTotals(budget.items, budget.margenGanancia, budget.impuestos);
+            
+            const manoObraItems = budget.items.filter(item => item.manoObraCopia && item.manoObraCopia.length > 0);
+            const materialesItems = budget.items.filter(item => !item.manoObraCopia || item.manoObraCopia.length === 0);
+            
+            const totalHorasTrabajo = Math.round(manoObraItems.reduce((sum, item) => {
+                const itemLaborHoursPerUnit = (item.manoObraCopia || []).reduce((s, l) => s + (parseFloat(l.rendimiento) || 0), 0);
+                return sum + (item.cantidad * itemLaborHoursPerUnit);
+            }, 0));
+            
+            const totalDias = totalHorasTrabajo > 0 ? Math.round((totalHorasTrabajo / (obreros * 8)) * 2) / 2 : 0;
+            
+            const subtotalManoObra = manoObraItems.reduce((sum, item) => sum + (item.cantidad * item.precioUnitarioHistorico), 0);
+            const subtotalMateriales = materialesItems.reduce((sum, item) => sum + (item.cantidad * item.precioUnitarioHistorico), 0);
 
-        if (logoPos === 'right') {
-            headerLeftHtml = companyInfoHtml;
-            headerRightHtml = `
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
-                    ${logoHtml}
-                    <div style="text-align:right;">
-                        <h3 style="font-family:var(--font-heading); font-size:1.2rem; color:${colorPdf};">${budget.codigo}</h3>
-                        <p style="font-size:0.85rem; color:var(--text-muted);">Fecha: ${budget.fecha}</p>
+            // Estructura de encabezado clásica
+            const logoHtmlClasico = hasLogo ? `<img src="${comp.logo}" alt="Logo" style="max-height:60px; max-width:140px; object-fit:contain; border-radius:4px;">` : '';
+            
+            bodyHtml = `
+                <style>
+                    /* Estilos para simulación de cuadrícula Excel */
+                    .excel-grid-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-family: 'Outfit', 'Plus Jakarta Sans', Arial, sans-serif;
+                        color: #000000 !important;
+                        margin-bottom: 20px;
+                    }
+                    .excel-grid-table th, .excel-grid-table td {
+                        border: 1px solid #d1d5db !important;
+                        padding: 8px 10px !important;
+                        font-size: 0.85rem !important;
+                        color: #000000 !important;
+                        vertical-align: middle;
+                    }
+                    .excel-grid-table th {
+                        background-color: #f3f4f6 !important;
+                        font-weight: bold;
+                        text-align: left;
+                        text-transform: uppercase;
+                        font-size: 0.75rem !important;
+                        letter-spacing: 0.5px;
+                    }
+                    .excel-banner-blue {
+                        background-color: ${colorPdf} !important;
+                        color: #ffffff !important;
+                        font-weight: bold !important;
+                        padding: 8px 12px !important;
+                        font-size: 0.9rem !important;
+                        text-transform: uppercase;
+                        border: 1px solid #d1d5db !important;
+                        text-align: left;
+                    }
+                    .excel-block-info {
+                        padding: 12px !important;
+                        background: #f9fafb !important;
+                        color: #000000 !important;
+                        border: 1px solid #d1d5db !important;
+                    }
+                    @media print {
+                        .excel-grid-table th, .excel-grid-table td {
+                            border: 1px solid #000000 !important;
+                        }
+                        .excel-banner-blue {
+                            background-color: ${colorPdf} !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                            color: #ffffff !important;
+                        }
+                    }
+                </style>
+
+                <!-- Panel de Ajuste Rápido de Planificación (No Imprimible) -->
+                <div class="no-print" style="margin-bottom: 20px; padding: 12px; background: rgba(91,155,213,0.08); border: 1px solid var(--border-color); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                    <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="sliders" style="width: 18px; color: ${colorPdf};"></i>
+                        <span>Ajustes de Planificación (Clásico Excel)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="margin-bottom: 0; font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Obreros:</label>
+                            <input type="number" id="detailWorkers" value="${obreros}" min="1" style="width: 65px; padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main);" onchange="window.ui.updateBudgetPlanning('${budget.id}', this.value, document.getElementById('detailValidity').value)">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="margin-bottom: 0; font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Validez:</label>
+                            <input type="text" id="detailValidity" value="${validez}" style="width: 100px; padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main);" onchange="window.ui.updateBudgetPlanning('${budget.id}', document.getElementById('detailWorkers').value, this.value)">
+                        </div>
                     </div>
                 </div>
-            `;
-        } else {
-            headerLeftHtml = `
-                <div style="display:flex; align-items:center; gap:16px;">
-                    ${logoHtml}
-                    ${companyInfoHtml}
-                </div>
-            `;
-            headerRightHtml = `
-                <div style="text-align:right;">
-                    <h3 style="font-family:var(--font-heading); font-size:1.2rem; color:${colorPdf};">${budget.codigo}</h3>
-                    <p style="font-size:0.85rem; color:var(--text-muted);">Fecha: ${budget.fecha}</p>
-                </div>
-            `;
-        }
 
-        // Construir contenido modal
-        const bodyHtml = `
-            <div id="printable-area" style="--pdf-primary-color: ${colorPdf};">
-                <!-- Encabezado del Presupuesto (Dinámico) -->
-                <div style="display:flex; justify-content:space-between; border-bottom:2px solid ${colorPdf}; padding-bottom:16px; margin-bottom:20px; align-items:center;">
-                    ${headerLeftHtml}
-                    ${headerRightHtml}
-                </div>
-
-                <!-- Detalles Cliente -->
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
-                    <div style="padding:12px 16px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:var(--radius-md);">
-                        <h4 style="font-family:var(--font-heading); color:${colorPdf}; margin-bottom:4px; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Información del Cliente</h4>
-                        <p style="font-weight:600; font-size:1rem; color:var(--text-main);">${budget.cliente}</p>
-                        <p style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Proyecto: ${budget.proyecto}</p>
+                <div id="printable-area" style="--pdf-primary-color: ${colorPdf}; background:#ffffff; color:#000000; padding:10px;">
+                    <!-- Cabecera de Dos Columnas -->
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            ${logoHtmlClasico}
+                            <div>
+                                <h2 style="font-size:1.4rem; font-weight:800; color:${colorPdf}; margin:0; line-height:1.2;">${comp.nombre}</h2>
+                                <p style="font-size:0.75rem; color:#4b5563; margin:2px 0 0 0; font-weight:500;">${comp.subtitulo}</p>
+                                <p style="font-size:0.7rem; color:#6b7280; margin:4px 0 0 0;">
+                                    ${comp.direccion ? `📍 ${comp.direccion}` : ''}
+                                    ${comp.telefono ? ` | 📞 ${comp.telefono}` : ''}
+                                    ${comp.email ? ` | ✉️ ${comp.email}` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <h3 style="font-size:1.15rem; font-weight:bold; color:${colorPdf}; margin:0;">Presupuesto N° ${budget.codigo}</h3>
+                        </div>
                     </div>
-                    <div style="padding:12px 16px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:var(--radius-md); display:flex; flex-direction:column; justify-content:center;">
-                        <p style="font-size:0.85rem; color:var(--text-muted);">Presupuesto N°: <strong style="color:var(--text-main);">${budget.codigo}</strong></p>
-                        <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">Fecha de Emisión: <strong style="color:var(--text-main);">${budget.fecha}</strong></p>
-                    </div>
-                </div>
 
-                <!-- Tabla de Ítems del Presupuesto -->
-                <div class="card" style="padding:0; overflow:hidden; border-radius:var(--radius-md); margin-bottom:20px;">
-                    <table style="width:100%;">
+                    <!-- Datos del Cliente (Banner Excel) -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                        <tr>
+                            <td class="excel-banner-blue">Datos del cliente</td>
+                        </tr>
+                        <tr>
+                            <td class="excel-block-info">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                    <div>
+                                        <table style="width:100%; border:none;">
+                                            <tr style="border:none;"><td style="border:none; padding:2px 0; font-weight:bold; width:80px; font-size:0.8rem; color:#4b5563;">Nombre:</td><td style="border:none; padding:2px 0; font-size:0.85rem;">${budget.cliente}</td></tr>
+                                            <tr style="border:none;"><td style="border:none; padding:2px 0; font-weight:bold; font-size:0.8rem; color:#4b5563;">Dirección:</td><td style="border:none; padding:2px 0; font-size:0.85rem;">${budget.proyecto}</td></tr>
+                                        </table>
+                                    </div>
+                                    <div>
+                                        <table style="width:100%; border:none;">
+                                            <tr style="border:none;"><td style="border:none; padding:2px 0; font-weight:bold; width:80px; font-size:0.8rem; color:#4b5563;">CUIT-NIF:</td><td style="border:none; padding:2px 0; font-size:0.85rem;">-</td></tr>
+                                            <tr style="border:none;"><td style="border:none; padding:2px 0; font-weight:bold; font-size:0.8rem; color:#4b5563;">Teléfono:</td><td style="border:none; padding:2px 0; font-size:0.85rem;">-</td></tr>
+                                            <tr style="border:none;"><td style="border:none; padding:2px 0; font-weight:bold; font-size:0.8rem; color:#4b5563;">E-mail:</td><td style="border:none; padding:2px 0; font-size:0.85rem;">-</td></tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Tabla de Fecha / Validez -->
+                    <table class="excel-grid-table" style="margin-bottom:15px;">
+                        <tr style="background:#f9fafb;">
+                            <td style="font-weight:bold; width:20%; color:${colorPdf}; font-size:0.8rem;">Fecha presupuesto</td>
+                            <td style="width:30%; font-size:0.85rem;">${budget.fecha}</td>
+                            <td style="font-weight:bold; width:20%; color:${colorPdf}; font-size:0.8rem;">Validez:</td>
+                            <td style="width:30%; font-size:0.85rem;">${validez}</td>
+                        </tr>
+                    </table>
+
+                    <!-- Tabla General de Ítems (Mano de Obra y Materiales) -->
+                    <table class="excel-grid-table">
                         <thead>
-                            <tr style="background:rgba(255,255,255,0.01); border-bottom:1.5px solid ${colorPdf};">
-                                <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted);">Item / Rubro</th>
-                                <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted);">Unidad</th>
-                                <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted); text-align:right;">Cantidad</th>
-                                <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted); text-align:right;">P. Unitario (APU)</th>
-                                <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted); text-align:right;">Total</th>
+                            <tr>
+                                <th style="width: 15%;">Categoría</th>
+                                <th style="width: 45%;">Descripción del Rubro</th>
+                                <th style="width: 10%; text-align: right;">Cantidad</th>
+                                <th style="width: 8%;">Unidad</th>
+                                <th style="width: 12%; text-align: right;">P. Unitario</th>
+                                <th style="width: 12%; text-align: right;">Subtotal</th>
+                                <th style="width: 8%; text-align: right;">Horas</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${budget.items.map(item => `
+                            <!-- Grupo Mano de Obra -->
+                            ${manoObraItems.map((item, idx) => {
+                                const itemLaborHoursPerUnit = (item.manoObraCopia || []).reduce((s, l) => s + (parseFloat(l.rendimiento) || 0), 0);
+                                const totalItemLaborHours = Math.round(item.cantidad * itemLaborHoursPerUnit);
+                                return `
+                                    <tr>
+                                        <td style="font-weight:bold; color:#5b9bd5;">[MANO DE OBRA]</td>
+                                        <td style="font-weight:500;">${item.nombre}</td>
+                                        <td style="text-align: right;">${this.formatCurrency(item.cantidad).replace(',00', '')}</td>
+                                        <td>${item.unidad}</td>
+                                        <td style="text-align: right;">$${this.formatCurrency(item.precioUnitarioHistorico)}</td>
+                                        <td style="text-align: right; font-weight:bold;">$${this.formatCurrency(item.cantidad * item.precioUnitarioHistorico)}</td>
+                                        <td style="text-align: right; font-weight:500;">${totalItemLaborHours}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            
+                            <!-- Separador de Materiales -->
+                            ${materialesItems.length > 0 ? materialesItems.map((item, idx) => {
+                                return `
+                                    <tr>
+                                        <td style="font-weight:bold; color:#10b981;">[MATERIALES]</td>
+                                        <td style="font-weight:500;">${item.nombre}</td>
+                                        <td style="text-align: right;">${this.formatCurrency(item.cantidad).replace(',00', '')}</td>
+                                        <td>${item.unidad}</td>
+                                        <td style="text-align: right;">$${this.formatCurrency(item.precioUnitarioHistorico)}</td>
+                                        <td style="text-align: right; font-weight:bold;">$${this.formatCurrency(item.cantidad * item.precioUnitarioHistorico)}</td>
+                                        <td style="text-align: right;">-</td>
+                                    </tr>
+                                `;
+                            }).join('') : `
                                 <tr>
-                                    <td style="padding:12px 16px;">
-                                        <div style="font-weight:600; color:var(--text-main);">${item.nombre}</div>
-                                        <div style="font-size:0.75rem; color:var(--text-muted);" class="no-print">
-                                            Composición: ${item.materialesCopia ? item.materialesCopia.length : 0} materiales, ${item.manoObraCopia ? item.manoObraCopia.length : 0} mano de obra.
-                                        </div>
-                                    </td>
-                                    <td style="padding:12px 16px;">${item.unidad}</td>
-                                    <td style="padding:12px 16px; text-align:right;">${item.cantidad}</td>
-                                    <td style="padding:12px 16px; text-align:right;">$${this.formatCurrency(item.precioUnitarioHistorico)}</td>
-                                    <td style="padding:12px 16px; text-align:right; font-weight:600; color:var(--text-main);">$${this.formatCurrency(item.cantidad * item.precioUnitarioHistorico)}</td>
+                                    <td style="font-weight:bold; color:#4b5563;">[MATERIALES]</td>
+                                    <td colspan="6" style="color:#9ca3af; font-style:italic; text-align:center; height:35px;">(Ningún material adicional cargado directamente en esta cotización)</td>
                                 </tr>
-                            `).join('')}
+                            `}
                         </tbody>
                     </table>
-                </div>
 
-                <!-- Totales del Presupuesto -->
-                <div style="display:flex; justify-content:flex-end; margin-top:20px; margin-bottom:24px;">
-                    <div style="width:300px; display:flex; flex-direction:column; gap:10px; padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-color); border-radius:var(--radius-md);">
-                        <div class="total-row" style="font-size:0.85rem;">
-                            <span style="color:var(--text-muted);">Costo Base:</span>
-                            <span style="color:var(--text-main); font-weight:500;">$${this.formatCurrency(budget.subtotal)}</span>
+                    <!-- Bloque de Totales Side-by-Side (Excel Style) -->
+                    <div style="display:flex; justify-content:space-between; margin-top:20px; gap:40px; align-items:flex-start;">
+                        <!-- Tabla Planificación de Tiempos (Izquierda) -->
+                        <div style="flex:1;">
+                            <table class="excel-grid-table" style="margin-top:0;">
+                                <tr>
+                                    <td style="font-weight:bold; width:60%; background:#f9fafb;">SUB-TOTAL HS TRABAJO</td>
+                                    <td style="text-align: right; font-weight:bold;">${totalHorasTrabajo} hs</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:bold; background:#f9fafb;">Obreros</td>
+                                    <td style="text-align: right; font-weight:bold;">${obreros}</td>
+                                </tr>
+                                <tr style="color:${colorPdf}; font-size:0.9rem; font-weight:bold;">
+                                    <td style="font-weight:bold; background:#f9fafb;">TOTAL DIAS</td>
+                                    <td style="text-align: right;">${this.formatCurrency(totalDias).replace(',00', '')} días</td>
+                                </tr>
+                            </table>
                         </div>
-                        <div class="total-row" style="font-size:0.85rem;">
-                            <span style="color:var(--text-muted);">Margen Comercial (${budget.margenGanancia}%):</span>
-                            <span style="color:var(--text-main); font-weight:500;">$${this.formatCurrency(budget.subtotal * (budget.margenGanancia / 100))}</span>
+
+                        <!-- Tabla Totales Económicos (Derecha) -->
+                        <div style="width:350px;">
+                            <table class="excel-grid-table" style="margin-top:0;">
+                                <tr>
+                                    <td style="font-weight:bold; width:60%; background:#f9fafb;">SUB-TOTAL MANO DE OBRA</td>
+                                    <td style="text-align: right; font-weight:bold;">$${this.formatCurrency(subtotalManoObra)}</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:bold; background:#f9fafb;">SUB-TOTAL MATERIALES</td>
+                                    <td style="text-align: right; font-weight:bold;">$${this.formatCurrency(subtotalMateriales)}</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:bold; background:#f9fafb;">DESCUENTO</td>
+                                    <td style="text-align: right; font-weight:bold;">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:bold; background:#f9fafb;">IVA (${budget.impuestos}%)</td>
+                                    <td style="text-align: right; font-weight:bold;">$${this.formatCurrency(totals.impuestosMonto)}</td>
+                                </tr>
+                                <tr style="color:${colorPdf}; font-size:0.95rem; font-weight:bold; border-top: 2px solid ${colorPdf};">
+                                    <td style="font-weight:bold; background:#f9fafb;">TOTAL PRESUPUESTADO</td>
+                                    <td style="text-align: right;">$${this.formatCurrency(budget.total)}</td>
+                                </tr>
+                            </table>
                         </div>
-                        <div class="total-row" style="border-bottom:1px solid var(--border-color); padding-bottom:8px; font-size:0.85rem;">
-                            <span style="color:var(--text-muted);">Impuestos (${budget.impuestos}%):</span>
-                            <span style="color:var(--text-main); font-weight:500;">$${this.formatCurrency((budget.subtotal + (budget.subtotal * (budget.margenGanancia / 100))) * (budget.impuestos / 100))}</span>
+                    </div>
+
+                    <!-- Condiciones del presupuesto -->
+                    ${comp.notasPie ? `
+                        <div style="margin-top: 25px; font-size: 0.8rem; color: #4b5563; border-top: 1px dashed #d1d5db; padding-top: 12px;">
+                            <h4 style="font-family:var(--font-heading); color:${colorPdf}; font-size:0.85rem; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Condiciones del Presupuesto</h4>
+                            <div style="white-space:pre-wrap; line-height:1.4;">${comp.notasPie}</div>
                         </div>
-                        <div class="total-row grand-total" style="border-top:none; padding-top:0; font-size:1.2rem;">
-                            <span>Total Final:</span>
-                            <span style="color:${colorPdf}; font-weight:bold;">$${this.formatCurrency(budget.total)}</span>
+                    ` : ''}
+
+                    <!-- Firmas de Conformidad -->
+                    <div style="margin-top:50px; display:flex; justify-content:space-between;">
+                        <div style="width:45%; text-align:center; border-top:1px solid #d1d5db; padding-top:8px; font-size:0.75rem; font-weight:bold; color:#4b5563;">
+                            Firma de la persona que confecciona el presupuesto
+                        </div>
+                        <div style="width:45%; text-align:center; border-top:1px solid #d1d5db; padding-top:8px; font-size:0.75rem; font-weight:bold; color:#4b5563;">
+                            Firma de aceptación del cliente
                         </div>
                     </div>
                 </div>
-
-                <!-- Notas de Condiciones Comerciales (Dinámicas) -->
-                ${comp.notasPie ? `
-                    <div style="border-top:1px dashed var(--border-color); padding-top:12px; font-size:0.8rem; color:var(--text-muted);">
-                        <h4 style="font-family:var(--font-heading); color:${colorPdf}; font-size:0.85rem; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Condiciones del Presupuesto</h4>
-                        <div style="white-space:pre-wrap; line-height:1.4;">${comp.notasPie}</div>
-                    </div>
-                ` : ''}
 
                 <!-- Desglose de Análisis de Precios Unitarios (APU) adjuntos (Solo pantalla, ayuda a poner precios) -->
                 <div class="no-print" style="margin-top:40px; border-top:1px solid var(--border-color); padding-top:24px;">
@@ -525,7 +671,7 @@ class ObraUI {
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:0.8rem;">
                                 <div>
                                     <div style="font-weight:600; color:var(--color-accent); margin-bottom:6px;">Materiales</div>
-                                    ${item.materialesCopia ? item.materialesCopia.map(m => `
+                                    ${item.materialesCopia && item.materialesCopia.length > 0 ? item.materialesCopia.map(m => `
                                         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                                             <span>• ${m.nombre} (${m.rendimiento} ${m.unidad})</span>
                                             <span style="color:var(--text-muted);">$${this.formatCurrency(m.precioUnitario)}/u</span>
@@ -534,7 +680,7 @@ class ObraUI {
                                 </div>
                                 <div>
                                     <div style="font-weight:600; color:var(--color-primary); margin-bottom:6px;">Mano de Obra</div>
-                                    ${item.manoObraCopia ? item.manoObraCopia.map(l => `
+                                    ${item.manoObraCopia && item.manoObraCopia.length > 0 ? item.manoObraCopia.map(l => `
                                         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                                             <span>• ${l.nombre} (${l.rendimiento} ${l.unidad})</span>
                                             <span style="color:var(--text-muted);">$${this.formatCurrency(l.precioUnitario)}/u</span>
@@ -545,8 +691,173 @@ class ObraUI {
                         </div>
                     `).join('')}
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            // Estructura de información de empresa
+            const companyInfoHtml = `
+                <div style="text-align: left;">
+                    <div style="font-size:1.3rem; font-weight:700; color:${colorPdf};">${comp.nombre}</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); font-weight:500;">${comp.subtitulo}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                        ${comp.direccion ? `📍 ${comp.direccion}` : ''}
+                        ${comp.telefono ? ` | 📞 ${comp.telefono}` : ''}
+                        ${comp.email ? ` | ✉️ ${comp.email}` : ''}
+                    </div>
+                </div>
+            `;
+
+            let headerLeftHtml = '';
+            let headerRightHtml = '';
+
+            if (logoPos === 'right') {
+                headerLeftHtml = companyInfoHtml;
+                headerRightHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                        ${logoHtml}
+                        <div style="text-align:right;">
+                            <h3 style="font-family:var(--font-heading); font-size:1.2rem; color:${colorPdf};">${budget.codigo}</h3>
+                            <p style="font-size:0.85rem; color:var(--text-muted);">Fecha: ${budget.fecha}</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                headerLeftHtml = `
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        ${logoHtml}
+                        ${companyInfoHtml}
+                    </div>
+                `;
+                headerRightHtml = `
+                    <div style="text-align:right;">
+                        <h3 style="font-family:var(--font-heading); font-size:1.2rem; color:${colorPdf};">${budget.codigo}</h3>
+                        <p style="font-size:0.85rem; color:var(--text-muted);">Fecha: ${budget.fecha}</p>
+                    </div>
+                `;
+            }
+
+            bodyHtml = `
+                <div id="printable-area" style="--pdf-primary-color: ${colorPdf};">
+                    <!-- Encabezado del Presupuesto (Dinámico) -->
+                    <div style="display:flex; justify-content:space-between; border-bottom:2px solid ${colorPdf}; padding-bottom:16px; margin-bottom:20px; align-items:center;">
+                        ${headerLeftHtml}
+                        ${headerRightHtml}
+                    </div>
+
+                    <!-- Detalles Cliente -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+                        <div style="padding:12px 16px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:var(--radius-md);">
+                            <h4 style="font-family:var(--font-heading); color:${colorPdf}; margin-bottom:4px; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Información del Cliente</h4>
+                            <p style="font-weight:600; font-size:1rem; color:var(--text-main);">${budget.cliente}</p>
+                            <p style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Proyecto: ${budget.proyecto}</p>
+                        </div>
+                        <div style="padding:12px 16px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:var(--radius-md); display:flex; flex-direction:column; justify-content:center;">
+                            <p style="font-size:0.85rem; color:var(--text-muted);">Presupuesto N°: <strong style="color:var(--text-main);">${budget.codigo}</strong></p>
+                            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">Fecha de Emisión: <strong style="color:var(--text-main);">${budget.fecha}</strong></p>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Ítems del Presupuesto -->
+                    <div class="card" style="padding:0; overflow:hidden; border-radius:var(--radius-md); margin-bottom:20px;">
+                        <table style="width:100%;">
+                            <thead>
+                                <tr style="background:rgba(255,255,255,0.01); border-bottom:1.5px solid ${colorPdf};">
+                                    <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted);">Item / Rubro</th>
+                                    <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted);">Unidad</th>
+                                    <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted); text-align:right;">Cantidad</th>
+                                    <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted); text-align:right;">P. Unitario (APU)</th>
+                                    <th style="padding:12px 16px; font-size:0.8rem; color:var(--text-muted); text-align:right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${budget.items.map(item => `
+                                    <tr>
+                                        <td style="padding:12px 16px;">
+                                            <div style="font-weight:600; color:var(--text-main);">${item.nombre}</div>
+                                            <div style="font-size:0.75rem; color:var(--text-muted);" class="no-print">
+                                                Composición: ${item.materialesCopia ? item.materialesCopia.length : 0} materiales, ${item.manoObraCopia ? item.manoObraCopia.length : 0} mano de obra.
+                                            </div>
+                                        </td>
+                                        <td style="padding:12px 16px;">${item.unidad}</td>
+                                        <td style="padding:12px 16px; text-align:right;">${item.cantidad}</td>
+                                        <td style="padding:12px 16px; text-align:right;">$${this.formatCurrency(item.precioUnitarioHistorico)}</td>
+                                        <td style="padding:12px 16px; text-align:right; font-weight:600; color:var(--text-main);">$${this.formatCurrency(item.cantidad * item.precioUnitarioHistorico)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totales del Presupuesto -->
+                    <div style="display:flex; justify-content:flex-end; margin-top:20px; margin-bottom:24px;">
+                        <div style="width:300px; display:flex; flex-direction:column; gap:10px; padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-color); border-radius:var(--radius-md);">
+                            <div class="total-row" style="font-size:0.85rem;">
+                                <span style="color:var(--text-muted);">Costo Base:</span>
+                                <span style="color:var(--text-main); font-weight:500;">$${this.formatCurrency(budget.subtotal)}</span>
+                            </div>
+                            <div class="total-row" style="font-size:0.85rem;">
+                                <span style="color:var(--text-muted);">Margen Comercial (${budget.margenGanancia}%):</span>
+                                <span style="color:var(--text-main); font-weight:500;">$${this.formatCurrency(budget.subtotal * (budget.margenGanancia / 100))}</span>
+                            </div>
+                            <div class="total-row" style="border-bottom:1px solid var(--border-color); padding-bottom:8px; font-size:0.85rem;">
+                                <span style="color:var(--text-muted);">Impuestos (${budget.impuestos}%):</span>
+                                <span style="color:var(--text-main); font-weight:500;">$${this.formatCurrency((budget.subtotal + (budget.subtotal * (budget.margenGanancia / 100))) * (budget.impuestos / 100))}</span>
+                            </div>
+                            <div class="total-row grand-total" style="border-top:none; padding-top:0; font-size:1.2rem;">
+                                <span>Total Final:</span>
+                                <span style="color:${colorPdf}; font-weight:bold;">$${this.formatCurrency(budget.total)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas de Condiciones Comerciales (Dinámicas) -->
+                    ${comp.notasPie ? `
+                        <div style="border-top:1px dashed var(--border-color); padding-top:12px; font-size:0.8rem; color:var(--text-muted);">
+                            <h4 style="font-family:var(--font-heading); color:${colorPdf}; font-size:0.85rem; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Condiciones del Presupuesto</h4>
+                            <div style="white-space:pre-wrap; line-height:1.4;">${comp.notasPie}</div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Desglose de Análisis de Precios Unitarios (APU) adjuntos (Solo pantalla, ayuda a poner precios) -->
+                    <div class="no-print" style="margin-top:40px; border-top:1px solid var(--border-color); padding-top:24px;">
+                        <h3 style="font-family:var(--font-heading); font-size:1.15rem; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                            <i data-lucide="info" style="color:var(--color-primary); width:18px;"></i> Desglose Técnico del Presupuesto (APU Histórico)
+                        </h3>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:16px;">
+                            A continuación se muestra el desglose exacto de materiales y mano de obra con el que se cotizó este presupuesto originalmente. Esto sirve de guía de precios unitarios.
+                        </p>
+                        
+                        ${budget.items.map(item => `
+                            <div class="card" style="margin-bottom:16px; padding:16px; background:rgba(0,0,0,0.15);">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+                                    <span style="font-weight:600;">${item.nombre} (por ${item.unidad})</span>
+                                    <span style="color:${colorPdf}; font-weight:600;">P.U. Histórico: $${this.formatCurrency(item.precioUnitarioHistorico)}</span>
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:0.8rem;">
+                                    <div>
+                                        <div style="font-weight:600; color:var(--color-accent); margin-bottom:6px;">Materiales</div>
+                                        ${item.materialesCopia ? item.materialesCopia.map(m => `
+                                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                                <span>• ${m.nombre} (${m.rendimiento} ${m.unidad})</span>
+                                                <span style="color:var(--text-muted);">$${this.formatCurrency(m.precioUnitario)}/u</span>
+                                            </div>
+                                        `).join('') : '<span style="color:var(--text-muted);">Sin materiales</span>'}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:600; color:var(--color-primary); margin-bottom:6px;">Mano de Obra</div>
+                                        ${item.manoObraCopia ? item.manoObraCopia.map(l => `
+                                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                                <span>• ${l.nombre} (${l.rendimiento} ${l.unidad})</span>
+                                                <span style="color:var(--text-muted);">$${this.formatCurrency(l.precioUnitario)}/u</span>
+                                            </div>
+                                        `).join('') : '<span style="color:var(--text-muted);">Sin mano de obra</span>'}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
 
         const footerHtml = `
             <div style="display:flex; justify-content:space-between; width:100%;">
@@ -569,6 +880,27 @@ class ObraUI {
 
         this.showModal(`Detalle de Presupuesto - ${budget.codigo}`, bodyHtml, footerHtml, true);
         lucide.createIcons();
+    }
+
+    updateBudgetPlanning(id, workers, validity) {
+        const budgets = window.db.getBudgets();
+        const budget = budgets.find(b => b.id === id);
+        if (budget) {
+            budget.obreros = parseInt(workers) || 2;
+            budget.validez = validity.trim();
+            window.db.saveBudget(budget);
+            
+            // Recargar detalles en tiempo real en la pantalla sin cerrar el modal
+            this.viewBudgetDetails(id);
+
+            // Refrescar vistas en el fondo
+            if (this.activeTab === 'budgets') {
+                this.renderBudgets(document.getElementById('view-content'));
+            } else if (this.activeTab === 'dashboard') {
+                this.renderDashboard(document.getElementById('view-content'));
+            }
+            lucide.createIcons();
+        }
     }
 
     updateBudgetStatus(id, newStatus) {
@@ -640,6 +972,19 @@ class ObraUI {
                             <div class="form-group">
                                 <label for="bldDate">Fecha</label>
                                 <input type="date" id="bldDate" value="${new Date().toISOString().split('T')[0]}" required>
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top: 12px;">
+                            <div class="form-group">
+                                <label for="bldValidity">Validez del Presupuesto</label>
+                                <input type="text" id="bldValidity" value="${window.db.getCompanySettings().validezPorDefecto || '15 días'}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="bldWorkers">Obreros Asignados (Planificación)</label>
+                                <input type="number" id="bldWorkers" value="${window.db.getCompanySettings().obrerosPorDefecto || 2}" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <!-- Espaciador para completar fila del grid -->
                             </div>
                         </div>
                     </div>
@@ -978,6 +1323,8 @@ class ObraUI {
             cliente: client,
             proyecto: project,
             fecha: date,
+            validez: document.getElementById('bldValidity').value.trim() || '15 días',
+            obreros: parseInt(document.getElementById('bldWorkers').value) || 2,
             estado: 'Borrador',
             items: itemsFinal,
             subtotal: totals.subtotal,
@@ -1977,6 +2324,29 @@ class ObraUI {
                     </div>
 
                     <div style="border-top:1px solid var(--border-color); padding-top:16px;">
+                        <h4 style="font-family:var(--font-heading); margin-bottom:12px;">Plantilla y Planificación</h4>
+                        
+                        <div class="form-group">
+                            <label for="compTemplate">Diseño de Plantilla Impresa (PDF)</label>
+                            <select id="compTemplate" onchange="window.ui.updateLivePdfPreview()">
+                                <option value="clasico" ${comp.templatePdf === 'clasico' ? 'selected' : ''}>Planilla Clásica Excel (Estilo Ingenio)</option>
+                                <option value="moderno" ${comp.templatePdf === 'moderno' ? 'selected' : ''}>Premium Moderno</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="compWorkers">Obreros por Defecto</label>
+                                <input type="number" id="compWorkers" value="${comp.obrerosPorDefecto || 2}" min="1" oninput="window.ui.updateLivePdfPreview()">
+                            </div>
+                            <div class="form-group">
+                                <label for="compValidity">Validez por Defecto</label>
+                                <input type="text" id="compValidity" value="${comp.validezPorDefecto || '15 días'}" oninput="window.ui.updateLivePdfPreview()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border-color); padding-top:16px;">
                         <h4 style="font-family:var(--font-heading); margin-bottom:12px;">Identidad Visual y Diseño</h4>
                         
                         <div class="form-group">
@@ -1999,7 +2369,7 @@ class ObraUI {
                             <div class="form-group">
                                 <label for="compColor">Color Temático PDF</label>
                                 <div style="display:flex; gap:8px; align-items:center;">
-                                    <input type="color" id="compColor" value="${comp.colorPdf || '#6366f1'}" oninput="window.ui.updateLivePdfPreview()" style="width:45px; height:45px; padding:0; border:none; cursor:pointer;">
+                                    <input type="color" id="compColor" value="${comp.colorPdf || '#5b9bd5'}" oninput="window.ui.updateLivePdfPreview()" style="width:45px; height:45px; padding:0; border:none; cursor:pointer;">
                                     <span style="font-size:0.8rem; color:var(--text-muted);">Color principal de encabezados</span>
                                 </div>
                             </div>
@@ -2024,83 +2394,7 @@ class ObraUI {
                         
                         <!-- Simulación del Papel Blanco A4 -->
                         <div id="pdfLivePreviewSheet" style="background:#ffffff; color:#1f2937; padding:30px; font-family:'Plus Jakarta Sans', sans-serif; font-size:0.75rem; min-height:600px; display:flex; flex-direction:column; justify-content:space-between;">
-                            
-                            <div>
-                                <!-- Encabezado Hoja -->
-                                <div id="preHeader" style="display:flex; justify-content:space-between; border-bottom:2px solid #e5e7eb; padding-bottom:12px; margin-bottom:16px; align-items:center; min-height:65px;">
-                                    <!-- Dinámico por JS -->
-                                </div>
-
-                                <!-- Datos Cliente Mock -->
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
-                                    <div style="padding:10px; border:1px solid #e5e7eb; border-radius:6px; background:#f9fafb;">
-                                        <div style="font-weight:700; color:#4b5563; font-size:0.7rem; text-transform:uppercase; margin-bottom:4px;">Información del Cliente</div>
-                                        <div style="font-weight:600; font-size:0.85rem; color:#111827;">Cliente Ejemplo S.A.</div>
-                                        <div style="color:#6b7280; font-size:0.75rem; margin-top:2px;">Proyecto: Construcción de Muro Divisorio</div>
-                                    </div>
-                                    <div style="padding:10px; border:1px solid #e5e7eb; border-radius:6px; background:#f9fafb; display:flex; flex-direction:column; justify-content:center;">
-                                        <div>Presupuesto: <strong>PRE-2026-042</strong></div>
-                                        <div>Fecha de Emisión: <strong>2026-05-25</strong></div>
-                                    </div>
-                                </div>
-
-                                <!-- Tabla Mock -->
-                                <table style="width:100%; border-collapse:collapse; text-align:left; color:#1f2937; margin-bottom:16px;">
-                                    <thead>
-                                        <tr style="border-bottom:1.5px solid #111827;" id="preTableHeader">
-                                            <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase;">Descripción del Rubro</th>
-                                            <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase; text-align:right;">Cantidad</th>
-                                            <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase; text-align:right;">P. Unitario</th>
-                                            <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase; text-align:right;">Subtotal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr style="border-bottom:1px solid #e5e7eb;">
-                                            <td style="padding:6px 8px; font-weight:600;">Mampostería de Ladrillo Común e=15cm</td>
-                                            <td style="padding:6px 8px; text-align:right;">50.00 m2</td>
-                                            <td style="padding:6px 8px; text-align:right;">$21.500,00</td>
-                                            <td style="padding:6px 8px; text-align:right; font-weight:600;">$1.075.000,00</td>
-                                        </tr>
-                                        <tr style="border-bottom:1px solid #e5e7eb;">
-                                            <td style="padding:6px 8px; font-weight:600;">Cimiento de Hormigón Armado para Vigas</td>
-                                            <td style="padding:6px 8px; text-align:right;">5.00 m3</td>
-                                            <td style="padding:6px 8px; text-align:right;">$125.000,00</td>
-                                            <td style="padding:6px 8px; text-align:right; font-weight:600;">$625.000,00</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                <!-- Totales Mock -->
-                                <div style="display:flex; justify-content:flex-end;">
-                                    <div style="width:180px; display:flex; flex-direction:column; gap:6px; font-size:0.7rem;">
-                                        <div style="display:flex; justify-content:space-between;">
-                                            <span style="color:#4b5563;">Costo Base:</span>
-                                            <span>$1.700.000,00</span>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between;">
-                                            <span style="color:#4b5563;">Gastos + Ganancia (20%):</span>
-                                            <span>$340.000,00</span>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #e5e7eb; padding-bottom:4px;">
-                                            <span style="color:#4b5563;">Impuestos (21%):</span>
-                                            <span>$428.400,00</span>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; font-weight:700; font-size:0.8rem; margin-top:2px;" id="preGrandTotalRow">
-                                            <span>Total Final:</span>
-                                            <span id="preTotalFinal">$2.468.400,00</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Notas al Pie Mock -->
-                            <div style="border-top:1px dashed #d1d5db; padding-top:10px; margin-top:20px; font-size:0.65rem; color:#6b7280;">
-                                <div style="font-weight:700; color:#4b5563; margin-bottom:4px; text-transform:uppercase;">Condiciones Comerciales:</div>
-                                <div id="preNotes" style="white-space:pre-wrap;">
-                                    <!-- Dinámico por JS -->
-                                </div>
-                            </div>
-
+                            <!-- El contenido se renderiza dinámicamente según la plantilla elegida -->
                         </div>
                     </div>
                 </div>
@@ -2134,52 +2428,301 @@ class ObraUI {
         const telefono = document.getElementById('compPhone').value.trim();
         const email = document.getElementById('compEmail').value.trim();
         const direccion = document.getElementById('compAddress').value.trim();
-        const color = document.getElementById('compColor').value || '#6366f1';
+        const color = document.getElementById('compColor').value || '#5b9bd5';
         const logo = document.getElementById('compLogoBase64').value;
         const logoPos = document.getElementById('compLogoPos').value;
         const notasPie = document.getElementById('compFootnotes').value;
-
-        // 1. Armar información de la empresa HTML
-        const companyInfoHtml = `
-            <div style="text-align: left;">
-                <div style="font-size: 1.1rem; font-weight: 700; color: ${color};">${nombre}</div>
-                <div style="font-size: 0.75rem; color: #4b5563; font-weight: 500;">${subtitulo}</div>
-                <div style="font-size: 0.7rem; color: #6b7280; margin-top: 3px;">
-                    ${direccion ? `📍 ${direccion}` : ''} 
-                    ${telefono ? ` | 📞 ${telefono}` : ''}
-                    ${email ? ` | ✉️ ${email}` : ''}
-                </div>
-            </div>
-        `;
+        
+        const templatePdf = document.getElementById('compTemplate').value;
+        const obreros = parseInt(document.getElementById('compWorkers').value) || 2;
+        const validez = document.getElementById('compValidity').value || '15 días';
 
         const logoHtml = logo ? `<img src="${logo}" style="max-height: 45px; max-width: 120px; object-fit: contain; border-radius:3px;">` : `<div style="width:40px; height:40px; background:#e5e7eb; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:0.6rem; font-weight:bold;">LOGO</div>`;
 
-        const preHeader = document.getElementById('preHeader');
-        if (logoPos === 'right') {
-            preHeader.innerHTML = `
-                ${companyInfoHtml}
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-                    ${logoHtml}
+        if (templatePdf === 'clasico') {
+            // Calcular días con base en 150 hs de mano de obra
+            const totalHorasTrabajo = 150;
+            const totalDias = Math.round((totalHorasTrabajo / (obreros * 8)) * 2) / 2;
+            
+            const previewHtml = `
+                <div style="background:#ffffff; color:#000000; font-family:'Outfit', 'Plus Jakarta Sans', Arial, sans-serif; font-size:0.75rem; display:flex; flex-direction:column; justify-content:space-between; height:100%; min-height:580px;">
+                    <div>
+                        <!-- Cabecera de Dos Columnas -->
+                        <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center; border-bottom:1.5px solid ${color}; padding-bottom:8px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                ${logo ? `<img src="${logo}" style="max-height: 45px; max-width: 110px; object-fit: contain; border-radius:3px;">` : ''}
+                                <div>
+                                    <h3 style="font-size:1.05rem; font-weight:800; color:${color}; margin:0; line-height:1.2;">${nombre}</h3>
+                                    <p style="font-size:0.65rem; color:#4b5563; margin:2px 0 0 0; font-weight:500;">${subtitulo}</p>
+                                    <p style="font-size:0.6rem; color:#6b7280; margin:3px 0 0 0;">
+                                        ${direccion ? `📍 ${direccion}` : ''}
+                                        ${telefono ? ` | 📞 ${telefono}` : ''}
+                                        ${email ? ` | ✉️ ${email}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <h4 style="font-size:0.9rem; font-weight:bold; color:${color}; margin:0;">Presupuesto N° PRE-2026-042</h4>
+                            </div>
+                        </div>
+
+                        <!-- Datos del Cliente (Banner Excel) -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+                            <tr>
+                                <td style="background-color: ${color} !important; color: #ffffff !important; font-weight: bold !important; padding: 5px 8px !important; font-size: 0.75rem !important; text-transform: uppercase; border: 1px solid #d1d5db !important; text-align: left;">Datos del cliente</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px !important; background: #f9fafb !important; color: #000000 !important; border: 1px solid #d1d5db !important; font-size:0.7rem !important;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                        <div>
+                                            <table style="width:100%; border:none;">
+                                                <tr style="border:none;"><td style="border:none; padding:1px 0; font-weight:bold; width:50px; font-size:0.7rem; color:#4b5563;">Nombre:</td><td style="border:none; padding:1px 0; font-size:0.7rem;">Cliente Ejemplo S.A.</td></tr>
+                                                <tr style="border:none;"><td style="border:none; padding:1px 0; font-weight:bold; font-size:0.7rem; color:#4b5563;">Obra:</td><td style="border:none; padding:1px 0; font-size:0.7rem;">Construcción de Muro Divisorio</td></tr>
+                                            </table>
+                                        </div>
+                                        <div>
+                                            <table style="width:100%; border:none;">
+                                                <tr style="border:none;"><td style="border:none; padding:1px 0; font-weight:bold; width:50px; font-size:0.7rem; color:#4b5563;">CUIT:</td><td style="border:none; padding:1px 0; font-size:0.7rem;">30-12345678-9</td></tr>
+                                                <tr style="border:none;"><td style="border:none; padding:1px 0; font-weight:bold; font-size:0.7rem; color:#4b5563;">E-mail:</td><td style="border:none; padding:1px 0; font-size:0.7rem;">contacto@ejemplo.com</td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Tabla de Fecha / Validez -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom:10px; border: 1px solid #d1d5db !important;">
+                            <tr style="background:#f9fafb;">
+                                <td style="font-weight:bold; width:20%; color:${color}; font-size:0.7rem; padding:6px; border: 1px solid #d1d5db !important;">Fecha presupuesto</td>
+                                <td style="width:30%; font-size:0.7rem; padding:6px; border: 1px solid #d1d5db !important;">25/05/2026</td>
+                                <td style="font-weight:bold; width:20%; color:${color}; font-size:0.7rem; padding:6px; border: 1px solid #d1d5db !important;">Validez:</td>
+                                <td style="width:30%; font-size:0.7rem; padding:6px; border: 1px solid #d1d5db !important;">${validez}</td>
+                            </tr>
+                        </table>
+
+                        <!-- Tabla General de Ítems (Excel Style) -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 1px solid #d1d5db !important;">
+                            <thead>
+                                <tr style="background-color: #f3f4f6 !important; font-weight: bold; text-transform: uppercase;">
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important;">Categoría</th>
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important;">Rubro</th>
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important; text-align:right; width:60px;">Cant.</th>
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important; width:40px;">Unid.</th>
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important; text-align:right; width:80px;">P. Unit</th>
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important; text-align:right; width:90px;">Subtotal</th>
+                                    <th style="padding:5px 6px; font-size:0.65rem; border: 1px solid #d1d5db !important; text-align:right; width:50px;">Horas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight:bold; color:${color}; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">[MANO DE OBRA]</td>
+                                    <td style="padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">Mampostería de Ladrillo Común e=15cm</td>
+                                    <td style="text-align: right; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">50</td>
+                                    <td style="padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">m2</td>
+                                    <td style="text-align: right; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$21.500,00</td>
+                                    <td style="text-align: right; font-weight:bold; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$1.075.000,00</td>
+                                    <td style="text-align: right; font-weight:500; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">150</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:bold; color:#10b981; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">[MATERIALES]</td>
+                                    <td style="padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">Hierro y Cemento Estructurales (Lote)</td>
+                                    <td style="text-align: right; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">5</td>
+                                    <td style="padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">u</td>
+                                    <td style="text-align: right; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$125.000,00</td>
+                                    <td style="text-align: right; font-weight:bold; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$625.000,00</td>
+                                    <td style="text-align: right; padding:5px 6px; border: 1px solid #d1d5db !important; font-size:0.65rem;">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Bloque de Totales Side-by-Side -->
+                        <div style="display:flex; justify-content:space-between; gap:20px; align-items:flex-start;">
+                            <!-- Planificación (Izquierda) -->
+                            <div style="flex:1;">
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db !important;">
+                                    <tr>
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">SUB-TOTAL HS TRABAJO</td>
+                                        <td style="text-align: right; font-weight:bold; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">150 hs</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">Obreros</td>
+                                        <td style="text-align: right; font-weight:bold; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">${obreros}</td>
+                                    </tr>
+                                    <tr style="color:${color}; font-weight:bold;">
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">TOTAL DIAS</td>
+                                        <td style="text-align: right; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">${totalDias} días</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Totales Económicos (Derecha) -->
+                            <div style="width:180px;">
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db !important;">
+                                    <tr>
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem; width:55%;">S.T. MANO OBRA</td>
+                                        <td style="text-align: right; font-weight:bold; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$1.075.000,00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">S.T. MATERIALES</td>
+                                        <td style="text-align: right; font-weight:bold; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$625.000,00</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">IVA (21%)</td>
+                                        <td style="text-align: right; font-weight:bold; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$357.000,00</td>
+                                    </tr>
+                                    <tr style="color:${color}; font-weight:bold; border-top:1.5px solid ${color};">
+                                        <td style="font-weight:bold; background:#f9fafb; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">TOTAL FINAL</td>
+                                        <td style="text-align: right; padding:5px; border: 1px solid #d1d5db !important; font-size:0.65rem;">$2.057.000,00</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Condiciones y Firmas -->
+                    <div>
+                        ${notasPie ? `
+                            <div style="border-top:1px dashed #d1d5db; padding-top:6px; margin-top:12px; font-size:0.6rem; color:#4b5563;">
+                                <div style="font-weight:700; color:${color}; margin-bottom:2px; text-transform:uppercase;">Condiciones:</div>
+                                <div style="white-space:pre-wrap; line-height:1.3;">${notasPie}</div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Firmas de Conformidad -->
+                        <div style="margin-top:25px; display:flex; justify-content:space-between; font-size:0.6rem; color:#4b5563;">
+                            <div style="width:45%; text-align:center; border-top:1px solid #d1d5db; padding-top:4px; font-weight:bold;">
+                                Firma Confeccionador
+                            </div>
+                            <div style="width:45%; text-align:center; border-top:1px solid #d1d5db; padding-top:4px; font-weight:bold;">
+                                Firma Aceptación Cliente
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
+            document.getElementById('pdfLivePreviewSheet').innerHTML = previewHtml;
         } else {
-            preHeader.innerHTML = `
-                <div style="display:flex; align-items:center; gap:12px;">
-                    ${logoHtml}
-                    ${companyInfoHtml}
+            // Estructura moderna (diseño premium original)
+            let headerLeftHtml = '';
+            let headerRightHtml = '';
+
+            if (logoPos === 'right') {
+                headerLeftHtml = `
+                    <div style="text-align: left;">
+                        <div style="font-size: 1.1rem; font-weight: 700; color: ${color};">${nombre}</div>
+                        <div style="font-size: 0.75rem; color: #4b5563; font-weight: 500;">${subtitulo}</div>
+                        <div style="font-size: 0.7rem; color: #6b7280; margin-top: 3px;">
+                            ${direccion ? `📍 ${direccion}` : ''}
+                            ${telefono ? ` | 📞 ${telefono}` : ''}
+                            ${email ? ` | ✉️ ${email}` : ''}
+                        </div>
+                    </div>
+                `;
+                headerRightHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                        ${logoHtml}
+                    </div>
+                `;
+            } else {
+                headerLeftHtml = `
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${logoHtml}
+                        <div style="text-align: left;">
+                            <div style="font-size: 1.1rem; font-weight: 700; color: ${color};">${nombre}</div>
+                            <div style="font-size: 0.75rem; color: #4b5563; font-weight: 500;">${subtitulo}</div>
+                            <div style="font-size: 0.7rem; color: #6b7280; margin-top: 3px;">
+                                ${direccion ? `📍 ${direccion}` : ''}
+                                ${telefono ? ` | 📞 ${telefono}` : ''}
+                                ${email ? ` | ✉️ ${email}` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                headerRightHtml = `
+                    <div style="text-align:right;">
+                        <div style="font-weight:700; font-size:0.9rem; color:${color};">PRE-2026-042</div>
+                        <div style="font-size:0.75rem; color:#6b7280; margin-top:2px;">Fecha: 2026-05-25</div>
+                    </div>
+                `;
+            }
+
+            const previewHtml = `
+                <div style="background:#ffffff; color:#1f2937; font-family:'Plus Jakarta Sans', sans-serif; font-size:0.75rem; display:flex; flex-direction:column; justify-content:space-between; height:100%; min-height:580px;">
+                    <div>
+                        <!-- Encabezado Hoja -->
+                        <div style="display:flex; justify-content:space-between; border-bottom:2px solid ${color}; padding-bottom:12px; margin-bottom:16px; align-items:center; min-height:65px;">
+                            ${headerLeftHtml}
+                            ${headerRightHtml}
+                        </div>
+
+                        <!-- Datos Cliente Mock -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                            <div style="padding:10px; border:1px solid #e5e7eb; border-radius:6px; background:#f9fafb;">
+                                <div style="font-weight:700; color:#4b5563; font-size:0.7rem; text-transform:uppercase; margin-bottom:4px;">Información del Cliente</div>
+                                <div style="font-weight:600; font-size:0.85rem; color:#111827;">Cliente Ejemplo S.A.</div>
+                                <div style="color:#6b7280; font-size:0.75rem; margin-top:2px;">Proyecto: Construcción de Muro Divisorio</div>
+                            </div>
+                            <div style="padding:10px; border:1px solid #e5e7eb; border-radius:6px; background:#f9fafb; display:flex; flex-direction:column; justify-content:center;">
+                                <div>Presupuesto: <strong>PRE-2026-042</strong></div>
+                                <div>Fecha de Emisión: <strong>2026-05-25</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Mock -->
+                        <table style="width:100%; border-collapse:collapse; text-align:left; color:#1f2937; margin-bottom:16px;">
+                            <thead>
+                                <tr style="border-bottom:2px solid ${color};">
+                                    <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase;">Descripción del Rubro</th>
+                                    <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase; text-align:right; width:70px;">Cantidad</th>
+                                    <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase; text-align:right; width:90px;">P. Unitario</th>
+                                    <th style="padding:6px 8px; font-size:0.7rem; font-weight:700; color:#374151; text-transform:uppercase; text-align:right; width:100px;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom:1px solid #e5e7eb;">
+                                    <td style="padding:6px 8px; font-weight:600;">Mampostería de Ladrillo Común e=15cm</td>
+                                    <td style="padding:6px 8px; text-align:right;">50.00 m2</td>
+                                    <td style="padding:6px 8px; text-align:right;">$21.500,00</td>
+                                    <td style="padding:6px 8px; text-align:right; font-weight:600;">$1.075.000,00</td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #e5e7eb;">
+                                    <td style="padding:6px 8px; font-weight:600;">Cimiento de Hormigón Armado para Vigas</td>
+                                    <td style="padding:6px 8px; text-align:right;">5.00 m3</td>
+                                    <td style="padding:6px 8px; text-align:right;">$125.000,00</td>
+                                    <td style="padding:6px 8px; text-align:right; font-weight:600;">$625.000,00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Totales Mock -->
+                        <div style="display:flex; justify-content:flex-end;">
+                            <div style="width:180px; display:flex; flex-direction:column; gap:6px; font-size:0.7rem;">
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:#4b5563;">Costo Base:</span>
+                                    <span>$1.700.000,00</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:#4b5563;">IVA (21%):</span>
+                                    <span>$357.000,00</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; font-weight:700; font-size:0.8rem; margin-top:2px; border-top:1px solid #e5e7eb; padding-top:4px; color:${color};">
+                                    <span>Total Final:</span>
+                                    <span>$2.057.000,00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas al Pie Mock -->
+                    <div style="border-top:1px dashed #d1d5db; padding-top:10px; margin-top:20px; font-size:0.65rem; color:#6b7280;">
+                        <div style="font-weight:700; color:#4b5563; margin-bottom:4px; text-transform:uppercase;">Condiciones Comerciales:</div>
+                        <div style="white-space:pre-wrap;">${notasPie || 'Sin condiciones particulares.'}</div>
+                    </div>
                 </div>
             `;
+            document.getElementById('pdfLivePreviewSheet').innerHTML = previewHtml;
         }
-
-        // Aplicar color en la cabecera de la tabla y total
-        const tableHeader = document.getElementById('preTableHeader');
-        tableHeader.style.borderBottom = `2px solid ${color}`;
-        
-        const totalRow = document.getElementById('preGrandTotalRow');
-        totalRow.style.color = color;
-
-        // Notas de condiciones
-        document.getElementById('preNotes').innerText = notasPie || 'Sin condiciones particulares.';
     }
 
     saveCompanyProfile() {
@@ -2192,6 +2735,10 @@ class ObraUI {
         const logo = document.getElementById('compLogoBase64').value;
         const logoPos = document.getElementById('compLogoPos').value;
         const notasPie = document.getElementById('compFootnotes').value;
+        
+        const templatePdf = document.getElementById('compTemplate').value;
+        const obrerosPorDefecto = parseInt(document.getElementById('compWorkers').value) || 2;
+        const validezPorDefecto = document.getElementById('compValidity').value.trim() || '15 días';
 
         if (!nombre) {
             alert('Por favor, ingresa al menos el Nombre Comercial de tu empresa.');
@@ -2208,7 +2755,10 @@ class ObraUI {
             logo,
             logoPos,
             notesPie: notasPie, // compatible con variables antiguas
-            notasPie
+            notasPie,
+            templatePdf,
+            obrerosPorDefecto,
+            validezPorDefecto
         };
 
         window.db.saveCompanySettings(settings);
