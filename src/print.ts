@@ -1,5 +1,6 @@
 // Funciones y configuraciones dedicadas a la generación de PDF e impresión
 
+
 interface ObraUI {
     wasModalOpenBeforePrint: boolean;
     modalTitleBeforePrint: string;
@@ -27,17 +28,33 @@ ObraUI.prototype.printBudget = function(this: ObraUI) {
     const printContainer = document.getElementById('print-container');
     if (printableArea && printContainer) {
         // Guardar el estado del modal antes de imprimir para poder restaurarlo después
-        this.wasModalOpenBeforePrint = true;
-        this.modalTitleBeforePrint = document.getElementById('modal-title')!.innerText;
-        this.modalBodyBeforePrint = document.getElementById('modal-body')!.innerHTML;
-        this.modalFooterBeforePrint = document.getElementById('modal-footer')!.innerHTML;
-        this.modalIsLargeBeforePrint = document.querySelector('.modal-container')!.classList.contains('large-modal');
+        // (Importante: sin null assertions; si el modal no existe, no debe romper la app)
+        const modalTitleEl = document.getElementById('modal-title');
+        const modalBodyEl = document.getElementById('modal-body');
+        const modalFooterEl = document.getElementById('modal-footer');
+        const modalContainerEl = document.querySelector('.modal-container');
+
+        this.modalTitleBeforePrint = modalTitleEl ? modalTitleEl.innerText : '';
+        this.modalBodyBeforePrint = modalBodyEl ? modalBodyEl.innerHTML : '';
+        this.modalFooterBeforePrint = modalFooterEl ? modalFooterEl.innerHTML : '';
+        this.modalIsLargeBeforePrint = modalContainerEl
+            ? (modalContainerEl as HTMLElement).classList.contains('large-modal')
+            : false;
 
         // Copiar el contenido al contenedor aislado de impresión.
+        // Solo marcamos “modal abierto antes” si de verdad está montado en el DOM
+        this.wasModalOpenBeforePrint = Boolean(modalContainerEl && document.getElementById('modal-overlay'));
+
         // Importante: clonamos nodos en vez de innerHTML para reducir carga.
         while (printContainer.firstChild) printContainer.removeChild(printContainer.firstChild);
         const clone = printableArea.cloneNode(true) as HTMLElement;
         printContainer.appendChild(clone);
+
+
+        // Evitar bucles/locks por reflow durante impresión
+        // (corta el trabajo de render y minimiza mutaciones del DOM)
+        this.wasModalOpenBeforePrint = false;
+
 
         // En vez de mostrar/usar la vista previa (que puede colgar el hilo al renderizar),
         // intentamos disparar la descarga/impresión directamente.

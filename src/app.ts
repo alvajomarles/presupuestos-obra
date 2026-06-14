@@ -54,19 +54,24 @@ window.addEventListener('afterprint', () => {
         printContainer.innerHTML = '';
     }
 
-    // Restaurar el modal si estaba abierto antes de imprimir
-    if (window.ui && window.ui.wasModalOpenBeforePrint) {
-        window.ui.wasModalOpenBeforePrint = false;
-        window.ui.showModal(
-            window.ui.modalTitleBeforePrint,
-            window.ui.modalBodyBeforePrint,
-            window.ui.modalFooterBeforePrint,
-            window.ui.modalIsLargeBeforePrint
-        );
-    } else if (window.ui && window.ui.activeTab === 'dashboard') {
-        const contentContainer = document.getElementById('view-content');
-        if (contentContainer) {
-            window.ui.renderDashboard(contentContainer);
+    // Restaurar el modal si estaba abierto antes de imprimir.
+    // Importante: no re-renderizar vistas grandes en afterprint para evitar locks en Edge/Chrome.
+    try {
+        if (window.ui && window.ui.wasModalOpenBeforePrint) {
+            // Solo restaurar si todavía existe el contenedor base del modal
+            if (document.getElementById('modal-overlay') && document.querySelector('.modal-container')) {
+                window.ui.wasModalOpenBeforePrint = false;
+                window.ui.showModal(
+                    window.ui.modalTitleBeforePrint,
+                    window.ui.modalBodyBeforePrint,
+                    window.ui.modalFooterBeforePrint,
+                    window.ui.modalIsLargeBeforePrint
+                );
+            } else {
+                window.ui.wasModalOpenBeforePrint = false;
+            }
         }
+    } catch (e) {
+        console.error('afterprint restore failed:', e);
     }
 });
